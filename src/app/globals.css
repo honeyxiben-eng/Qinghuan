@@ -1,0 +1,329 @@
+@import "tailwindcss";
+
+/* =============================================
+   HyperOS 3 Design System
+   Glass Morphism · Ambient Light · Warm Dark
+   ============================================= */
+:root {
+  /* ── Surfaces ── */
+  --bg-void: #0a0a0f;
+  --surface-1: rgba(255,255,255,0.04);
+  --surface-2: rgba(255,255,255,0.07);
+  --surface-3: rgba(255,255,255,0.10);
+  --surface-base: #111115;
+  --surface-elevated: #181820;
+  --glass: rgba(255,255,255,0.06);
+  --glass-strong: rgba(255,255,255,0.10);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-border-strong: rgba(255,255,255,0.14);
+
+  /* ── Text ── */
+  --t1: #f5f5f7;
+  --t2: rgba(255,255,255,0.55);
+  --t3: rgba(255,255,255,0.35);
+  --t4: rgba(255,255,255,0.18);
+
+  /* ── Accent colors ── */
+  --accent: #4a9eff;
+  --accent-2: #34d399;
+  --accent-soft: rgba(74,158,255,0.10);
+  --accent-ring: rgba(74,158,255,0.25);
+  --accent-glow: 0 0 14px rgba(74,158,255,0.30);
+  --accent-grad: linear-gradient(135deg, #4a9eff, #3b82f6);
+  --accent-cyan: #4a9eff;
+  --accent-magenta: #fb7185;
+  --accent-purple: #a78bfa;
+
+  --green: #4ade80;  --green-soft: rgba(74,222,128,0.10);
+  --amber: #fbbf24;  --amber-soft: rgba(251,191,36,0.10);
+  --red: #f87171;    --red-soft: rgba(248,113,113,0.10);
+  --sky: #60a5fa;    --sky-soft: rgba(96,165,250,0.10);
+  --purple: #a78bfa; --purple-soft: rgba(167,139,250,0.10);
+
+  --emerald-grad: linear-gradient(135deg, #34d399, #10b981);
+  --sky-grad: linear-gradient(135deg, #60a5fa, #3b82f6);
+  --amber-grad: linear-gradient(135deg, #f59e0b, #fbbf24);
+  --rose-grad: linear-gradient(135deg, #f87171, #fb7185);
+
+  /* ── Border & Radii ── */
+  --border: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.04);
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 20px; --r-xl: 24px; --r-full: 9999px;
+
+  /* ── Shadows ── */
+  --s-1: 0 1px 3px rgba(0,0,0,0.25);
+  --s-2: 0 4px 12px rgba(0,0,0,0.35);
+  --s-3: 0 8px 24px rgba(0,0,0,0.45);
+  --s-4: 0 12px 40px rgba(0,0,0,0.55);
+  --s-lg: 0 16px 48px rgba(0,0,0,0.6);
+  --shadow-glass: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+
+  /* ── Typography ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", "Fira Code", ui-monospace, "Cascadia Code", monospace;
+
+  /* ── Spacing ── */
+  --sp-page-x: 32px; --sp-page-y: 28px; --sp-card: 20px; --sp-gap: 16px;
+  --content-max-w: 1440px;
+
+  /* ── Layout ── */
+  --sidebar-w: 240px;
+  --sidebar-collapsed-w: 68px;
+  --topbar-h: 56px;
+
+  /* ── Blur ── */
+  --blur-sm: blur(12px);
+  --blur-md: blur(20px);
+  --blur-lg: blur(32px);
+  --blur-xl: blur(40px);
+
+  /* ── Transitions ── */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast: 0.18s;
+  --dur-normal: 0.25s;
+  --dur-slow: 0.4s;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{font-family:var(--font-sans);background:var(--bg-void);color:var(--t1);line-height:1.6;overflow-x:hidden}
+::selection{background:var(--accent-soft);color:var(--accent)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.15)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-ring)}
+input,select,textarea{color:var(--t1);caret-color:var(--accent)}
+input[type=date]{color-scheme:dark}
+input[type=checkbox]{accent-color:var(--accent)}
+
+/* ── Animations ── */
+@keyframes fadeUp{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+@keyframes scaleIn{0%{opacity:0;transform:scale(0.95)}100%{opacity:1;transform:scale(1)}}
+@keyframes slideDown{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes pop{0%{opacity:0;transform:scale(0.92)}70%{transform:scale(1.01)}100%{opacity:1;transform:scale(1)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes glowPulse{0%,100%{opacity:0.6}50%{opacity:1}}
+@keyframes ambientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes marqueeScroll{0%{transform:translateY(0)}100%{transform:translateY(-50%)}}
+
+/* Legacy aliases for backward compatibility */
+@keyframes rise{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes spring{0%{opacity:0;transform:scale(0.96) translateY(6px)}60%{opacity:1;transform:scale(1.01) translateY(-1px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes slideIn{0%{opacity:0;transform:translateX(-6px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes cardIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
+
+.rise{animation:fadeUp .4s var(--ease-spring) both}
+.spring{animation:scaleIn .4s var(--ease-spring) both}
+.pop{animation:scaleIn .35s var(--ease-spring) both}
+.slide-in{animation:slideIn .3s var(--ease-spring) both}
+.stagger>*{animation:fadeUp .4s var(--ease-spring) both}
+.stagger>:nth-child(1){animation-delay:0s}.stagger>:nth-child(2){animation-delay:.03s}
+.stagger>:nth-child(3){animation-delay:.06s}.stagger>:nth-child(4){animation-delay:.09s}
+.stagger>:nth-child(5){animation-delay:.12s}.stagger>:nth-child(6){animation-delay:.15s}
+.stagger>:nth-child(7){animation-delay:.18s}.stagger>:nth-child(8){animation-delay:.21s}
+.stagger>:nth-child(9){animation-delay:.24s}.stagger>:nth-child(10){animation-delay:.27s}
+.stagger>:nth-child(11){animation-delay:.3s}.stagger>:nth-child(12){animation-delay:.33s}
+
+/* ── Glass Card ── */
+.card{background:var(--surface-2);border:1px solid var(--glass-border);border-radius:var(--r-lg);box-shadow:var(--shadow-glass);backdrop-filter:var(--blur-sm);transition:box-shadow var(--dur-normal) var(--ease-spring),border-color var(--dur-normal) var(--ease-spring),transform var(--dur-fast) var(--ease-spring)}
+.card:hover{box-shadow:var(--s-3);border-color:var(--glass-border-strong)}
+
+/* ── Stat Card ── */
+.stat-card{position:relative;background:var(--surface-2);border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:20px 22px;backdrop-filter:var(--blur-sm);box-shadow:var(--shadow-glass);transition:box-shadow var(--dur-normal) var(--ease-spring),border-color var(--dur-normal) var(--ease-spring),transform var(--dur-fast) var(--ease-spring);animation:fadeUp .4s var(--ease-spring) both;overflow:hidden}
+.stat-card:hover{box-shadow:var(--s-3);border-color:var(--glass-border-strong);transform:translateY(-2px)}
+.stat-card .stat-icon{width:40px;height:40px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;margin-bottom:14px;flex-shrink:0}
+.stat-card .stat-label{font-size:12px;font-weight:500;color:var(--t2);margin-bottom:6px;letter-spacing:0.01em}
+.stat-card .stat-value{font-size:28px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-0.03em}
+.stat-card .stat-accent-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:0 0 3px 3px}
+
+/* ── Badge ── */
+.badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:var(--r-full);font-size:11px;font-weight:600;line-height:1.5;letter-spacing:0.01em}
+.badge-ok{background:var(--green-soft);color:var(--green)}
+.badge-warn{background:var(--amber-soft);color:var(--amber)}
+.badge-bad{background:var(--red-soft);color:var(--red)}
+.badge-dim{background:var(--surface-1);color:var(--t3)}
+
+/* ── Data Table ── */
+.data-table{width:100%;border-collapse:separate;border-spacing:0}
+.data-table th{padding:6px 10px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--t3);white-space:nowrap;text-align:center;background:var(--surface-2);border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:1}
+.data-table td{padding:0 10px;font-size:10.5px;text-align:center;border-bottom:1px solid var(--border-light);transition:background var(--dur-fast) ease;color:var(--t1);line-height:1.4;vertical-align:middle}
+.data-table tbody tr{height:32px !important}
+.data-table tbody tr:hover{background:var(--surface-2)}
+.data-table .badge{margin:0 auto}
+
+/* ── Data Card Grid ── */
+.data-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.data-card-item{background:var(--surface-2);border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow-glass);backdrop-filter:var(--blur-sm);transition:box-shadow var(--dur-normal) var(--ease-spring),border-color var(--dur-normal) var(--ease-spring),transform var(--dur-fast) var(--ease-spring);position:relative}
+.data-card-item:hover{box-shadow:var(--s-3);border-color:var(--glass-border-strong);transform:translateY(-1px)}
+.data-card-item .dc-check{position:absolute;top:16px;right:16px;z-index:2}
+.data-card-item .dc-id{font-size:15px;font-weight:700;font-family:var(--font-mono);color:var(--t1)}
+.data-card-item .dc-meta{font-size:11px;color:var(--t3);margin-top:3px}
+.data-card-item .dc-values{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.data-card-item .dc-val{text-align:center;padding:8px 6px;border-radius:var(--r-sm);background:var(--surface-1)}
+.data-card-item .dc-val-num{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.data-card-item .dc-val-lbl{font-size:9px;color:var(--t3);margin-top:3px;white-space:nowrap}
+
+/* ── Page Container ── */
+.page-container{max-width:var(--content-max-w);margin:0 auto;padding:20px var(--sp-page-x)}
+
+/* ── Tab Bar ── */
+.tab-bar{display:inline-flex;gap:3px;padding:4px;border-radius:var(--r-full);background:var(--surface-1);border:1px solid var(--glass-border)}
+.tab-item{display:flex;align-items:center;gap:6px;padding:7px 16px;border-radius:var(--r-full);font-size:13px;font-weight:500;color:var(--t3);cursor:pointer;transition:all var(--dur-fast) var(--ease-spring);border:none;background:transparent}
+.tab-item:hover{color:var(--t1)}
+.tab-item.active{color:var(--accent);background:var(--accent-soft);font-weight:600}
+
+/* ── Filter Chip ── */
+.filter-chip{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--r-full);font-size:12px;font-weight:500;cursor:pointer;transition:all var(--dur-fast) var(--ease-spring);border:1px solid var(--glass-border);color:var(--t2);background:var(--surface-1)}
+.filter-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.filter-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+
+/* ── Pagination ── */
+.pagination-compact{display:flex;align-items:center;gap:4px;padding:12px 16px;justify-content:flex-end;border-top:1px solid var(--border-light);font-size:12px;color:var(--t3)}
+.pagination-compact button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--r-sm);border:1px solid transparent;font-size:12px;font-weight:500;cursor:pointer;transition:all var(--dur-fast) var(--ease-spring);color:var(--t2);background:transparent}
+.pagination-compact button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.pagination-compact button.cur{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.pagination-compact button:disabled{opacity:0.25;cursor:default}
+
+/* ── Button ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 18px;border-radius:var(--r-full);font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all var(--dur-fast) var(--ease-spring);white-space:nowrap;text-decoration:none;line-height:1.2;position:relative;overflow:hidden;letter-spacing:-0.01em}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 12px rgba(74,158,255,0.3)}
+.btn-primary:hover{box-shadow:0 4px 20px rgba(74,158,255,0.4);transform:translateY(-1px);filter:brightness(1.08)}
+.btn-secondary{background:var(--surface-2);color:var(--t2);border:1px solid var(--glass-border);backdrop-filter:var(--blur-sm)}
+.btn-secondary:hover{background:var(--surface-3);color:var(--t1);border-color:var(--glass-border-strong)}
+.btn-danger{background:var(--red);color:#fff;box-shadow:0 2px 10px rgba(248,113,113,0.25)}
+.btn-danger:hover{box-shadow:0 4px 18px rgba(248,113,113,0.35);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--t3)}
+.btn-ghost:hover{background:var(--surface-1);color:var(--t1)}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-xs{padding:4px 10px;font-size:11px}
+.btn:disabled{opacity:0.35;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+
+/* ── Panel ── */
+.panel{background:var(--surface-2);border:1px solid var(--glass-border);border-radius:var(--r-lg);box-shadow:var(--shadow-glass);backdrop-filter:var(--blur-sm);overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border-light)}
+.panel-title{font-size:14px;font-weight:600;color:var(--t1)}
+.panel-tick{width:3px;height:16px;border-radius:2px;background:var(--accent)}
+
+/* ── Report Card ── */
+.report-card{background:var(--surface-2);border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:22px 24px;box-shadow:var(--shadow-glass);backdrop-filter:var(--blur-sm);transition:box-shadow var(--dur-normal) var(--ease-spring),transform var(--dur-fast) var(--ease-spring)}
+.report-card:hover{box-shadow:var(--s-3);transform:translateY(-2px)}
+.report-card-title{font-size:12px;font-weight:500;color:var(--t2);margin-bottom:12px;letter-spacing:0.01em}
+.report-card-value{font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-0.03em}
+.report-card-sub{font-size:11px;color:var(--t3);margin-top:6px}
+
+/* ── Alert Banner ── */
+.alert-banner{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--r-full);font-size:12px;font-weight:500;animation:fadeUp .35s var(--ease-spring) both}
+
+/* ── Gauge Ring ── */
+.gauge-ring{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.gauge-ring svg{transform:rotate(-90deg)}
+.gauge-ring-bg{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:5}
+.gauge-ring-fg{fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .8s var(--ease-spring)}
+.gauge-ring-text{position:absolute;text-align:center}
+.gauge-ring-text .val{font-size:16px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.gauge-ring-text .lbl{font-size:9px;color:var(--t3);margin-top:2px}
+
+/* ── Search Overlay ── */
+.search-overlay{position:fixed;inset:0;z-index:999;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,0.45);backdrop-filter:var(--blur-sm);animation:fadeIn .2s ease both}
+.search-panel{width:100%;max-width:540px;max-height:400px;overflow:auto;background:var(--surface-3);border:1px solid var(--glass-border-strong);border-radius:var(--r-xl);box-shadow:var(--s-lg);backdrop-filter:var(--blur-lg);animation:scaleIn .3s var(--ease-spring) both}
+
+/* ── Float Toolbar ── */
+.float-toolbar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:var(--r-full);background:var(--surface-3);backdrop-filter:var(--blur-lg);border:1px solid var(--glass-border-strong);box-shadow:var(--s-4);z-index:50;animation:scaleIn .5s var(--ease-spring) both .2s}
+.float-toolbar button{display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--r-full);font-size:12px;font-weight:500;border:none;cursor:pointer;transition:all var(--dur-fast) ease;color:var(--t2);background:transparent}
+.float-toolbar button:hover{background:var(--accent-soft);color:var(--accent)}
+
+/* ── Skeleton ── */
+.skeleton{background:linear-gradient(90deg,var(--surface-1) 25%,var(--surface-2) 50%,var(--surface-1) 75%);background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite;border-radius:var(--r-sm)}
+
+/* ── Utilities ── */
+.tabular-nums{font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft);border-radius:4px;padding:1px 4px;color:var(--accent);font-weight:600}
+select{appearance:none;-webkit-appearance:none;cursor:pointer;color-scheme:dark}
+.divider{height:1px;background:var(--glass-border);margin:16px 0;border:none}
+.divider-light{height:1px;background:var(--border-light);margin:12px 0;border:none}
+
+/* ── LED Indicators ── */
+.led{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0}
+.led-on{background:var(--green);box-shadow:0 0 6px rgba(74,222,128,0.5)}
+.led-warn{background:var(--amber);box-shadow:0 0 6px rgba(251,191,36,0.5)}
+.led-off{background:var(--t4)}
+
+/* ── Sidebar Glass ── */
+.sidebar-glass{background:rgba(10,10,15,0.80);backdrop-filter:var(--blur-lg);border-right:1px solid var(--glass-border)}
+.sidebar-item{border-radius:var(--r-sm);transition:all var(--dur-fast) var(--ease-spring)}
+.sidebar-item:hover{background:var(--surface-1)}
+.sidebar-item.active{background:var(--accent-soft)}
+
+/* ── Surface Table ── */
+.surface-table{border:1px solid var(--glass-border);border-radius:var(--r-lg);overflow:hidden;background:var(--surface-2);backdrop-filter:var(--blur-sm);box-shadow:var(--shadow-glass)}
+td input,td select{text-align:center!important;border:none!important;box-shadow:none!important;background:transparent!important;width:100%;height:28px;font-size:10.5px}
+td input[type="checkbox"]{width:13px;height:13px;accent-color:var(--accent)}
+
+/* ── Ambient Background ── */
+.ambient-bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.ambient-blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:0.04;animation:ambientShift 60s ease-in-out infinite}
+
+/* ── 极致丝滑优化 ── */
+.data-table{contain:layout style}
+.data-table tbody tr{transition:background 0.15s ease}
+.card,.stat-card,.panel{will-change:transform}
+.btn{transition:all 0.2s cubic-bezier(0.16,1,0.3,1)}
+.btn:active{transform:scale(0.97)}
+.filter-chip{transition:all 0.2s cubic-bezier(0.16,1,0.3,1)}
+.filter-chip:active{transform:scale(0.97)}
+.tab-item{transition:all 0.2s cubic-bezier(0.16,1,0.3,1)}
+
+/* ── Empty State ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center}
+.empty-state-icon{width:56px;height:56px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;margin-bottom:16px;background:var(--surface-1)}
+.empty-state-title{font-size:15px;font-weight:600;color:var(--t1);margin-bottom:6px}
+.empty-state-desc{font-size:13px;color:var(--t3);margin-bottom:20px;max-width:320px}
+
+/* ── Selected Row ── */
+tr.row-selected{background:var(--accent-soft)!important}
+tr.row-selected td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+
+/* ── Focus Ring Animation ── */
+@keyframes focusPulse{0%,100%{box-shadow:0 0 0 3px var(--accent-ring)}50%{box-shadow:0 0 0 5px var(--accent-ring)}}
+input:focus-visible,select:focus-visible{animation:focusPulse 1.5s ease-in-out infinite}
+
+/* ── Compact Page Header ── */
+.page-header-compact{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.page-header-compact h1{font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--t1)}
+
+/* ── Chip Group ── */
+.chip-group{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.chip-group::-webkit-scrollbar{display:none}
+
+/* ── Page Transition ── */
+@keyframes pageEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.page-enter{animation:pageEnter .25s var(--ease-spring) both}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── DayPicker 缩小 ── */
+.sl-daypicker .rdp{font-size:12px}
+.sl-daypicker .rdp-nav{margin-bottom:4px}
+.sl-daypicker .rdp-month_caption{font-size:13px;font-weight:600;margin-bottom:6px}
+.sl-daypicker .rdp-day{width:30px;height:30px;font-size:11px}
+.sl-daypicker .rdp-selected .rdp-day_button{background:var(--accent);color:#fff}
+.sl-daypicker .rdp-day_button:hover{background:var(--surface-1)}
+
+@media print {
+  body { background: #fff !important; color: #111 !important; }
+  .ambient-bg, .sidebar-glass, header, nav, .btn, .filter-chip, .tab-bar, .float-toolbar { display: none !important; }
+  main { margin-left: 0 !important; margin-top: 0 !important; height: auto !important; overflow: visible !important; }
+  main > div { overflow: visible !important; }
+  .card, .panel, .stat-card, .report-card { background: #fff !important; border: 1px solid #ddd !important; box-shadow: none !important; backdrop-filter: none !important; }
+  .page-container { padding: 20px !important; }
+  h1, h2, h3 { color: #111 !important; }
+  .data-table th { background: #f5f5f5 !important; color: #333 !important; }
+  .data-table td { color: #111 !important; border-bottom-color: #eee !important; }
+}

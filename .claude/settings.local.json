@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell(java *)",
+      "Bash(wmic OS get TotalVisibleMemorySize,FreePhysicalMemory)",
+      "Bash(systeminfo)",
+      "PowerShell(docker info *)",
+      "PowerShell(winget *)",
+      "Bash(git clone *)",
+      "PowerShell(pnpm *)",
+      "PowerShell(npm install *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(\\(Get-Item \"C:\\\\Users\\\\Schem\\\\Desktop\\\\TreeNB\\\\metabase-app\\\\metabase.jar\"\\).Length / 1MB)",
+      "PowerShell(Set-Location *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "PowerShell(try { $response = Invoke-WebRequest -Uri \"http://localhost:3000\" -Method HEAD -TimeoutSec 5 -UseBasicParsing; Write-Output \"Status: $\\($response.StatusCode\\)\" } catch { Write-Output \"Not ready yet: $_\" })",
+      "PowerShell(Start-Process \"http://localhost:3000\")",
+      "PowerShell($response = Invoke-WebRequest -Uri \"http://localhost:3000/api/session/properties\" -UseBasicParsing; $data = $response.Content | ConvertFrom-Json; $locales = $data.'supported-locales'; $siteLocale = $data.'site-locale'; Write-Output \"Locales: $\\($locales -join ','\\)\"; Write-Output \"Site locale: $siteLocale\"; Write-Output \"Version: $\\($data.version.tag\\)\")",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Schem\\\\Desktop\\\\TreeNB\\\\nocodb-source\\\\packages\\\\nc-gui\\\\package.json\" | ConvertFrom-Json\\).name)",
+      "Bash(kill %1 %2 %3)",
+      "PowerShell(npx nocodb --help 2>&1 | Select-Object -First 10)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Schem\\\\Desktop\\\\TreeNB\\\\noco-app\" -ErrorAction SilentlyContinue | Select-Object Name, Length; if \\(Test-Path \"C:\\\\Users\\\\Schem\\\\Desktop\\\\TreeNB\\\\noco-app\\\\node_modules\"\\) { \\(Get-ChildItem \"C:\\\\Users\\\\Schem\\\\Desktop\\\\TreeNB\\\\noco-app\\\\node_modules\" -Directory\\).Count.ToString\\(\\) + \" packages installed so far\" })"
+    ]
+  }
+}

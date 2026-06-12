@@ -1,0 +1,13 @@
+.vercel
+node_modules/
+.next/
+*.db
+*.db-wal
+*.db-journal
+.env
+claude/
+tmp_*
+screenshots/
+nocodb-source/
+apps/miniapp/
+mimo.exe

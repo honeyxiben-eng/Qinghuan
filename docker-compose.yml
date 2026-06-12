@@ -1,0 +1,54 @@
+# ============================================
+# 智慧盐湖平台 — Phase 2 本地开发环境
+# ============================================
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: saltlake-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: saltlake
+      POSTGRES_USER: saltlake
+      POSTGRES_PASSWORD: saltlake_dev_2026
+      # 性能参数
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 768MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      POSTGRES_WAL_BUFFERS: 16MB
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saltlake"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saltlake-net
+
+  # Redis (缓存层 — Phase 2B 启用)
+  redis:
+    image: redis:7-alpine
+    container_name: saltlake-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - saltlake-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  saltlake-net:
+    driver: bridge

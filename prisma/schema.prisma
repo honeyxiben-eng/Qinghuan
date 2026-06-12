@@ -1,0 +1,82 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model WellLineInfo {
+  id        Int        @id @default(autoincrement())
+  name      String
+  shortName String     @unique
+  region    String
+  regionSeq Int
+  wells     WellInfo[]
+}
+
+model WellInfo {
+  wellId            String              @id
+  lineId            Int
+  completionDate    DateTime?
+  technology        String?
+  techNote          String?
+  wellSize          String?
+  initialWaterLevel Float?
+  designDepth       Float?
+  coordX            Float?
+  coordY            Float?
+  line              WellLineInfo        @relation(fields: [lineId], references: [id])
+  monitorings       DynamicMonitoring[]
+  labData           LabData[]
+  maintenances      MaintenanceRecord[]
+}
+
+model DynamicMonitoring {
+  id           Int      @id @default(autoincrement())
+  wellId       String
+  collectDate  DateTime @default(now())
+  staticWater  Float?
+  dynamicWater Float?
+  wellDepth    Float?
+  flowRate     Float?
+  pumpDepth    Float?
+  pumpFlow     Float?
+  motorPower   Float?
+  manufacturer String?
+  status       String   @default("normal")
+  faultNote    String?
+  well         WellInfo @relation(fields: [wellId], references: [wellId])
+}
+
+model LabData {
+  id        Int      @id @default(autoincrement())
+  wellId    String
+  testDate  DateTime @default(now())
+  tester    String?
+  viscosity Float?
+  density   Float?
+  salinity  Float?
+  kPlus     Float?
+  mg2Plus   Float?
+  clMinus   Float?
+  so42Minus Float?
+  ca2Plus   Float?
+  b2o3      Float?
+  ph        Float?
+  liPlus    Float?
+  naPlus    Float?
+  well      WellInfo @relation(fields: [wellId], references: [wellId])
+}
+
+model MaintenanceRecord {
+  id          Int      @id @default(autoincrement())
+  wellId      String
+  reportTime  DateTime @default(now())
+  faultType   String?
+  status      String   @default("pending")
+  handler     String?
+  description String?
+  well        WellInfo @relation(fields: [wellId], references: [wellId])
+}
+
