@@ -82,7 +82,14 @@
       "Bash(grep -E \"^\\\\\\\\\\\\\\\\\\(electron|package\\)\")",
       "Bash(cp \"build-out/智慧盐湖数据管理平台 Setup 1.0.0.exe\" release/)",
       "Bash(Remove-Item -Recurse -Force \"metabase-app\")",
-      "Bash(Write-Host \"metabase-app deleted\")"
+      "Bash(Write-Host \"metabase-app deleted\")",
+      "Bash(ls -la .vercel/)",
+      "Bash(cat .vercel/project.json)",
+      "Bash(git commit -m 'v1.6: cleanup + deploy ready *)",
+      "Bash(npx vercel *)",
+      "Bash(gh auth *)",
+      "Bash(gh --version)",
+      "Bash(git remote *)"
     ]
   }
 }

@@ -8,7 +8,7 @@ async function svc(mod: string, fn: string, ...args: any[]): Promise<any> {
 }
 
 async function safe<T>(fn: () => T): Promise<T> {
-  try { return fn() } catch (e: any) { throw new Error(e.message || "服务器内部错误") }
+  try { return await fn() } catch (e: any) { throw new Error(e.message || "服务器内部错误") }
 }
 
 export async function getWells(o?: any) { return safe(() => svc("wells", "getWells", o)) }
@@ -64,7 +64,7 @@ export async function getLabMonths() {
 export async function getMonthDataForLine(lineId: number, month: string) {
   return safe(async () => {
     const { all } = await import("@/server/db")
-    const data = all("SELECT wi.wellId,ld.kPlus,ld.liPlus FROM WellInfo wi JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE wi.lineId=? ORDER BY wi.wellId", [month, lineId])
+    const data = await all("SELECT wi.wellId,ld.kPlus,ld.liPlus FROM WellInfo wi JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE wi.lineId=? ORDER BY wi.wellId", [month, lineId])
     return { prevMonth: month, data }
   })
 }
@@ -72,7 +72,7 @@ export async function getMonthDataForLine(lineId: number, month: string) {
 export async function getCurrentDataMonth() {
   return safe(async () => {
     const { one } = await import("@/server/db")
-    const r = one<{ mo: string }>("SELECT strftime('%Y-%m',testDate) as mo FROM LabData ORDER BY testDate DESC LIMIT 1")
+    const r = await one<{ mo: string }>("SELECT strftime('%Y-%m',testDate) as mo FROM LabData ORDER BY testDate DESC LIMIT 1")
     return r?.mo || null
   })
 }

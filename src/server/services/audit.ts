@@ -12,7 +12,7 @@ interface AuditEntry {
 
 export async function auditLog(entry: AuditEntry) {
   try {
-    run(
+    await run(
       `INSERT INTO AuditLog (userId, action, entityType, entityId, oldValues, newValues, ipAddress)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -57,13 +57,13 @@ export async function getAuditLogs(opts: {
   const page = opts.page || 1
   const pageSize = opts.pageSize || 20
 
-  const countResult = one<{ count: number }>(
+  const countResult = await one<{ count: number }>(
     `SELECT COUNT(*) as count FROM AuditLog ${where}`,
     params
   )
   const total = countResult?.count || 0
 
-  const data = all(
+  const data = await all(
     `SELECT * FROM AuditLog ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
     [...params, pageSize, (page - 1) * pageSize]
   )
