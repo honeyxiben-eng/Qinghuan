@@ -2,6 +2,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Database, ChevronDown, ChevronUp } from 'lucide-react'
 import { exportXLSX } from '@/lib/export'
+import { usePathname } from 'next/navigation'
+
+const STORAGE_KEY = 'treenb-chat-history'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -21,17 +24,45 @@ const EXAMPLES = [
   "北部片区有多少口井？",
 ]
 
+function getPageContext(pathname: string): string {
+  const pages: Record<string, string> = {
+    '/': '用户正在查看中控台仪表盘，显示采卤井总览、井采线分布、K⁺/Li⁺均值对比等数据。',
+    '/wells': '用户正在查看基础信息页面，管理采卤井档案数据。',
+    '/monitoring': '用户正在查看监测数据页面，管理动态监测记录。',
+    '/lab': '用户正在查看化验数据页面，管理卤水化验记录。',
+    '/analysis': '用户正在查看数据分析页面，进行井采线对比、月度报告、异常检测。',
+    '/chat': '用户正在使用智能问答助手。',
+  }
+  return pages[pathname] || '用户正在使用盐湖智管平台。'
+}
+
 export function ChatPanel() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [expandedSql, setExpandedSql] = useState<Record<number, boolean>>({})
   const scrollRef = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
+  }, [messages])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+    } catch {}
   }, [messages])
 
   const send = async (text?: string) => {
@@ -44,10 +75,14 @@ export function ChatPanel() {
     setLoading(true)
 
     try {
-      const history = messages.slice(-6).map(m => ({
-        role: m.role,
-        content: m.content,
-      }))
+      const pageInfo = getPageContext(pathname)
+      const history = [
+        { role: 'system', content: pageInfo },
+        ...messages.slice(-6).map(m => ({
+          role: m.role,
+          content: m.content,
+        }))
+      ]
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -87,8 +122,8 @@ export function ChatPanel() {
   const exportData = (data: any[], desc: string) => {
     if (!data || data.length === 0) return
     const headers = Object.keys(data[0])
-    const rows = data.map(r => headers.map(h => r[h]))
-    exportXLSX('智能查询_' + desc, headers, rows)
+    const rows = data.map(r => r ? headers.map(h => r[h]) : [])
+    exportXLSX({ filename: '智能查询_' + desc, headers, rows })
   }
 
   const toggleSql = (idx: number) => {
@@ -104,6 +139,13 @@ export function ChatPanel() {
           <span className="panel-title">智能问答助手</span>
           <span className="text-[11px]" style={{ color: 'var(--t3)' }}>由通义千问驱动</span>
         </div>
+        {messages.length > 0 && (
+          <button onClick={() => { setMessages([]); localStorage.removeItem(STORAGE_KEY) }}
+            className="text-[11px] px-2 py-1 rounded-[var(--r-sm)] hover:bg-[var(--surface-1)] transition-colors"
+            style={{ color: 'var(--t3)' }}>
+            清空对话
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -184,7 +226,7 @@ export function ChatPanel() {
                         <tbody>
                           {msg.data.slice(0, 10).map((row: any, j: number) => (
                             <tr key={j} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                              {Object.values(row).map((val: any, k: number) => (
+                              {row && Object.values(row).map((val: any, k: number) => (
                                 <td key={k} className="py-1.5 px-2" style={{ color: 'var(--t1)' }}>
                                   {val != null ? String(val) : '—'}
                                 </td>

@@ -1,16 +1,18 @@
 "use client"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { WELL_LINES, REGIONS } from "@/lib/well-data"
-import { getMonitorings, createMonitoring, getAdjacentMonths, updateMonitoring, deleteMonitorings, importMonitorings, exportMonitorings } from "@/app/actions"
-import { fmt, fmtDate, P } from "@/lib/precision"
-import { exportXLSX } from "@/lib/export"
+import { getMonitorings, createMonitoring, getAdjacentMonths, updateMonitoring, deleteMonitorings, importMonitorings, exportMonitorings, getLastRecord } from "@/app/actions"
+import { fmt, fmtDate, P } from "@/shared/precision"
+import { exportXLSX, exportCSV } from "@/lib/export"
 import { addToast } from "@/components/ui/Toast"
 import { monitoringCreateSchema } from "@/shared/validation"
+import { useFieldValidation } from "@/hooks/useFieldValidation"
 
 import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
 import Select from "@/components/ui/Select"
 import DataStats from "@/components/ui/DataStats"
+import EmptyState, { EmptyDataIcon } from "@/components/ui/EmptyState"
 
 import { Activity, Gauge, Waves, Droplets, ArrowDown, Factory, Zap, Pencil, Download } from "lucide-react"
 import Pagination from "@/components/ui/Pagination"
@@ -19,7 +21,6 @@ import DateField from "@/components/ui/DateField"
 
 const PS = 15
 const SM: Record<string, string> = { normal: "正常", abnormal: "异常", stopped: "停止", abandoned: "废弃" }
-const LINE_OPTS_E = [{ value: "", label: "选择" }, ...WELL_LINES.map(l => ({ value: l.shortName, label: l.name }))]
 const STATUS_OPTS = [{ value: "normal", label: "正常" }, { value: "abnormal", label: "异常" }]
 const bad = (s: string) => s === "abnormal" ? "badge-bad" : s === "stopped" ? "badge-warn" : s === "normal" ? "badge-ok" : "badge-dim"
 function hi(t: string, q: string) { if (!q || !t) return t || "-"; const s = String(t); const i = s.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return s; return <>{s.slice(0, i)}<span className="hl">{s.slice(i, i + q.length)}</span>{s.slice(i + q.length)}</> }
@@ -31,19 +32,20 @@ export default function MonitoringPage() {
   const [search, setSearch] = useState(""); const [region, setRegion] = useState(""); const [df, setDF] = useState(""); const [dt, setDT] = useState("")
   const [page, setPage] = useState(1); const [sel, setSel] = useState(new Set<string>()); const [delOpen, setDelOpen] = useState(false)
   const [eid, setEid] = useState<number | null>(null); const [ev, setEv] = useState<any>({})
-  const [data, setData] = useState<any[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false)
+  const [data, setData] = useState<any[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false); const [stats, setStats] = useState<any>(null)
 
-  const [mw, setMw] = useState(""); const [ml, setMl] = useState(""); const [md, setMd] = useState(new Date().toISOString().split("T")[0])
+  const [mw, setMw] = useState(""); const [md, setMd] = useState(new Date().toISOString().split("T")[0])
   const [sw, setSw] = useState(""); const [dw, setDw] = useState(""); const [wd, setWd] = useState(""); const [fr, setFr] = useState("")
   const [pd, setPd] = useState(""); const [pf, setPf] = useState(""); const [mp, setMp] = useState(""); const [mf, setMf] = useState("")
   const [st, setSt] = useState("normal"); const [fn, setFn] = useState(""); const [is, setIs] = useState<string[]>([])
-  const [contEntry, setContEntry] = useState(false)
+  const [contEntry, setContEntry] = useState(false); const [submitting, setSubmitting] = useState(false)
+  const { errors: fieldErrors, validateField } = useFieldValidation(monitoringCreateSchema.partial())
 
   const allIds = useMemo(() => { const ids: string[] = []; for (const l of WELL_LINES) { const ln = l as any; if (ln.numbers) for (const n of ln.numbers) ids.push(ln.prefix + String(n).padStart(3, "0")) } return ids }, [])
   const sw_ = (v: string) => { const cn = WELL_LINES.filter(l => l.name.includes(v) || l.shortName.toLowerCase().includes(v.toLowerCase())); const r: string[] = []; for (const l of cn) { const ln = l as any; if (ln.numbers) for (const n of ln.numbers) r.push(ln.prefix + String(n).padStart(3, "0")) } return r }
 
   const fetchRef = useRef<() => void>(() => {})
-  fetchRef.current = () => { setLoading(true); getMonitorings({ region: region || undefined, search: search || undefined, dateFrom: df || undefined, dateTo: dt || undefined, page, pageSize: PS }).then((r: any) => { setData(r.data); setTotal(r.total) }).finally(() => setLoading(false)) }
+  fetchRef.current = () => { setLoading(true); getMonitorings({ region: region || undefined, search: search || undefined, dateFrom: df || undefined, dateTo: dt || undefined, page, pageSize: PS }).then((r: any) => { setData(r.data); setTotal(r.total); setStats(r.stats || null) }).finally(() => setLoading(false)) }
   const fetch = useCallback(() => fetchRef.current(), [])
   useEffect(() => { document.title = "清欢 · 监测数据"; fetch() }, [region, df, dt, page])
   useEffect(() => { const t = setTimeout(fetch, 300); return () => clearTimeout(t) }, [search])
@@ -56,10 +58,24 @@ export default function MonitoringPage() {
   const doSave = useCallback(async () => { const v = evRef.current; if (!eid) return; try { await updateMonitoring(eid, { collectDate: v.collectDate || undefined, staticWater: v.staticWater ? parseFloat(v.staticWater) : undefined, dynamicWater: v.dynamicWater ? parseFloat(v.dynamicWater) : undefined, wellDepth: v.wellDepth ? parseFloat(v.wellDepth) : undefined, flowRate: v.flowRate ? parseFloat(v.flowRate) : undefined, pumpDepth: v.pumpDepth ? parseFloat(v.pumpDepth) : undefined, pumpFlow: v.pumpFlow ? parseFloat(v.pumpFlow) : undefined, motorPower: v.motorPower ? parseFloat(v.motorPower) : undefined, manufacturer: v.manufacturer || undefined, status: v.status }); addToast("已更新", "success"); setEid(null); setEv({}); fetch() } catch (e: any) { addToast("更新失败:" + e.message, "error") } }, [eid, fetch])
   useEffect(() => { if (!eid) return; const h = (e: KeyboardEvent) => { if (e.key === "Escape") ce(); if (e.key === "Enter") { e.preventDefault(); doSave() } }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h) }, [eid, ce, doSave])
   const hs = (v: string) => { setMw(v.toUpperCase()); const pool = allIds; const cn = sw_(v); const all = [...new Set([...pool.filter(id => id.toUpperCase().includes(v.toUpperCase())), ...cn])]; setIs(v.length >= 1 ? all.slice(0, 8) : []) }
+  const fillFromLast = async (wellId: string) => {
+    const last = await getLastRecord(wellId, 'monitoring')
+    if (!last) { addToast('该井暂无历史监测数据', 'info'); return }
+    if (!sw && !dw) { if (last.staticWater != null) setSw(String(last.staticWater)); else if (last.dynamicWater != null) setDw(String(last.dynamicWater)) }
+    if (!wd && last.wellDepth != null) setWd(String(last.wellDepth))
+    if (!fr && last.flowRate != null) setFr(String(last.flowRate))
+    if (!pd && last.pumpDepth != null) setPd(String(last.pumpDepth))
+    if (!pf && last.pumpFlow != null) setPf(String(last.pumpFlow))
+    if (!mp && last.motorPower != null) setMp(String(last.motorPower))
+    if (!mf) setMf(last.manufacturer || '')
+    setSt(last.status || 'normal')
+    addToast('空字段已从上次记录追溯填充', 'info')
+  }
   const an = (v: string, s: (x: string) => void) => { const n = parseFloat(v); if (!isNaN(n) && n > 0) s(String(Math.round(-n * 100) / 100)) }
-  const cf = () => { setMw(""); setMl(""); setMd(new Date().toISOString().split("T")[0]); setSw(""); setDw(""); setWd(""); setFr(""); setPd(""); setPf(""); setMp(""); setMf(""); setSt("normal"); setFn(""); setIs([]) }
-  const sub = async (e: React.FormEvent) => { e.preventDefault(); if (!mw) { addToast("请填写井号", "warning"); return } const vResult = monitoringCreateSchema.safeParse({ wellId: mw, collectDate: md || undefined, staticWater: sw ? parseFloat(sw) : undefined, dynamicWater: dw ? parseFloat(dw) : undefined, wellDepth: wd ? parseFloat(wd) : undefined, flowRate: fr ? parseFloat(fr) : undefined, pumpDepth: pd ? parseFloat(pd) : undefined, pumpFlow: pf ? parseFloat(pf) : undefined, motorPower: mp ? parseFloat(mp) : undefined, manufacturer: mf || undefined, status: st, faultNote: st === "abnormal" ? fn || undefined : undefined }); if (!vResult.success) { addToast(vResult.error.issues[0].message, "warning"); return } try { await createMonitoring(vResult.data); addToast("已保存", "success"); cf() } catch (e: any) { addToast("保存失败:" + e.message, "error") } }
-  const doExp = async () => { try { const all = await getMonitorings({ region: region || undefined, search: search || undefined, dateFrom: df || undefined, dateTo: dt || undefined, pageSize: 99999 }); const rows = (all as any).data || []; if (!rows.length) { addToast("无数据可导出", "warning"); return }; exportXLSX("监测数据", ["井号", "日期", "静水位", "动水位", "井深", "流量", "泵深", "泵量", "电机", "厂家", "状态"], rows.map((r: any) => [r.wellId, fmtDate(r.collectDate), fmt(r.staticWater, P.WATER), fmt(r.dynamicWater, P.WATER), fmt(r.wellDepth, P.WELL_DEPTH), fmt(r.flowRate, P.FLOW), fmt(r.pumpDepth, P.PUMP_DEPTH), fmt(r.pumpFlow, P.PUMP_FLOW), fmt(r.motorPower, P.MOTOR), r.manufacturer || "--", SM[r.status] || r.status])); addToast("已导出 " + rows.length + " 条", "success") } catch (e: any) { addToast("导出失败: " + e.message, "error") } }
+  const cf = () => { setMw(""); setMd(new Date().toISOString().split("T")[0]); setSw(""); setDw(""); setWd(""); setFr(""); setPd(""); setPf(""); setMp(""); setMf(""); setSt("normal"); setFn(""); setIs([]) }
+  const sub = async (e: React.FormEvent) => { e.preventDefault(); if (submitting) return; if (!mw) { addToast("请填写井号", "warning"); return } const vResult = monitoringCreateSchema.safeParse({ wellId: mw, collectDate: md || undefined, staticWater: sw ? parseFloat(sw) : undefined, dynamicWater: dw ? parseFloat(dw) : undefined, wellDepth: wd ? parseFloat(wd) : undefined, flowRate: fr ? parseFloat(fr) : undefined, pumpDepth: pd ? parseFloat(pd) : undefined, pumpFlow: pf ? parseFloat(pf) : undefined, motorPower: mp ? parseFloat(mp) : undefined, manufacturer: mf || undefined, status: st, faultNote: st === "abnormal" ? fn || undefined : undefined }); if (!vResult.success) { addToast(vResult.error.issues[0].message, "warning"); return } setSubmitting(true); try { await createMonitoring(vResult.data); addToast("已保存", "success"); cf() } catch (e: any) { addToast("保存失败:" + e.message, "error") } finally { setSubmitting(false) } }
+  const doExp = async () => { try { const all = await getMonitorings({ region: region || undefined, search: search || undefined, dateFrom: df || undefined, dateTo: dt || undefined, pageSize: 99999 }); const rows = (all as any).data || []; if (!rows.length) { addToast("无数据可导出", "warning"); return }; exportXLSX({ filename: "监测数据", headers: ["井号", "日期", "静水位", "动水位", "井深", "流量", "泵深", "泵量", "电机", "厂家", "状态"], rows: rows.map((r: any) => [r.wellId, fmtDate(r.collectDate), fmt(r.staticWater, P.WATER), fmt(r.dynamicWater, P.WATER), fmt(r.wellDepth, P.WELL_DEPTH), fmt(r.flowRate, P.FLOW), fmt(r.pumpDepth, P.PUMP_DEPTH), fmt(r.pumpFlow, P.PUMP_FLOW), fmt(r.motorPower, P.MOTOR), r.manufacturer || "--", SM[r.status] || r.status]) }); addToast("已导出 " + rows.length + " 条", "success") } catch (e: any) { addToast("导出失败: " + e.message, "error") } }
+  const doExpCSV = async () => { try { const all = await getMonitorings({ region: region || undefined, search: search || undefined, dateFrom: df || undefined, dateTo: dt || undefined, pageSize: 99999 }); const rows = (all as any).data || []; if (!rows.length) { addToast("无数据可导出", "warning"); return } exportCSV("监测数据", ["井号", "日期", "静水位", "动水位", "井深", "流量", "泵深", "泵量", "电机", "厂家", "状态"], rows.map((r: any) => [r.wellId, fmtDate(r.collectDate), fmt(r.staticWater, P.WATER), fmt(r.dynamicWater, P.WATER), fmt(r.wellDepth, P.WELL_DEPTH), fmt(r.flowRate, P.FLOW), fmt(r.pumpDepth, P.PUMP_DEPTH), fmt(r.pumpFlow, P.PUMP_FLOW), fmt(r.motorPower, P.MOTOR), r.manufacturer || "--", SM[r.status] || r.status])); addToast("CSV 已导出", "success") } catch (e: any) { addToast("导出失败: " + e.message, "error") } }
 
   const goAdj = async (dir: -1 | 1) => {
     const cm = df ? df.slice(0, 7) : new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0");
@@ -126,14 +142,20 @@ export default function MonitoringPage() {
         <span className="text-[12px]" style={{ color: "var(--t3)" }}>至</span>
         <DateField value={dt} onChange={v => { setDT(v); setPage(1) }} w={150} placeholder="结束日期" clearable />
         <div className="flex-1" />
-        <Button variant="secondary" size="sm" onClick={doExp} disabled={!data.length}><Download size={12} className="mr-1" />导出</Button>
+        <Button variant="secondary" size="sm" onClick={doExp} disabled={!data.length}><Download size={12} className="mr-1" />Excel</Button>
+        <Button variant="secondary" size="sm" onClick={doExpCSV} disabled={!data.length}>CSV</Button>
         <Button variant="danger" size="sm" onClick={() => { if (sel.size === 0) { addToast("请先选择", "warning"); return } setDelOpen(true) }} disabled={sel.size === 0}>删除{sel.size > 0 ? "(" + sel.size + ")" : ""}</Button>
       </div>
       <div className="overflow-hidden">
         {loading && data.length === 0 ? (
           <div className="py-16 flex justify-center"><div className="w-6 h-6 border-[3px] border-[var(--accent)] border-t-transparent rounded-full animate-spin" /></div>
         ) : data.length === 0 ? (
-          <div className="py-16 text-center"><p className="text-[13px]" style={{ color: "var(--t2)" }}>暂无数据</p><Button variant="primary" size="sm" onClick={() => setTab("entry")} className="mt-3">立即录入</Button></div>
+          <EmptyState
+            icon={<EmptyDataIcon />}
+            title="暂无监测数据"
+            description="点击上方按钮开始录入监测数据"
+            action={<Button variant="primary" size="sm" onClick={() => setTab("entry")}>立即录入</Button>}
+          />
         ) : (
           <div className="overflow-x-auto">
             {loading && <div className="sticky top-0 left-0 right-0 h-[2px] z-10" style={{ background: "linear-gradient(90deg,transparent,var(--accent),transparent)", backgroundSize: "200% 100%", animation: "shimmer 1s ease-in-out infinite" }} />}
@@ -141,67 +163,36 @@ export default function MonitoringPage() {
               <tbody>{data.map((r: any, i: number) => { const ed = eid === r.id; return <tr key={r.id} className="hover:bg-[var(--surface-1)]" style={{ borderBottom: "1px solid var(--border-light)", background: ed ? "var(--accent-soft)" : undefined }}><td className="text-center"><input type="checkbox" checked={sel.has(String(r.id))} onChange={() => to(String(r.id))} /></td><td className="text-center tabular-nums" style={{ color: "var(--t3)" }}>{(page - 1) * PS + i + 1}</td><td className="text-center font-semibold" style={{ fontFamily: "var(--font-mono)", color: "var(--t1)" }}>{hi(r.wellId, search)}</td><td className="text-center" style={{ color: "var(--t1)" }}>{ed ? <input className={TI} value={ev.collectDate} onChange={e => setEv({ ...ev, collectDate: e.target.value })} /> : fmtDate(r.collectDate)}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.staticWater} onChange={e => setEv({ ...ev, staticWater: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.staticWater, P.WATER)}</span>}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.dynamicWater} onChange={e => setEv({ ...ev, dynamicWater: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.dynamicWater, P.WATER)}</span>}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.wellDepth} onChange={e => setEv({ ...ev, wellDepth: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.wellDepth, P.WELL_DEPTH)}</span>}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.flowRate} onChange={e => setEv({ ...ev, flowRate: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.flowRate, P.FLOW)}</span>}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.pumpDepth} onChange={e => setEv({ ...ev, pumpDepth: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.pumpDepth, P.PUMP_DEPTH)}</span>}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.pumpFlow} onChange={e => setEv({ ...ev, pumpFlow: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.pumpFlow, P.PUMP_FLOW)}</span>}</td><td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.motorPower} onChange={e => setEv({ ...ev, motorPower: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(r.motorPower, P.MOTOR)}</span>}</td><td className="text-center">{ed ? <input className={TI} value={ev.manufacturer} onChange={e => setEv({ ...ev, manufacturer: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{r.manufacturer || "--"}</span>}</td><td className="text-center">{ed ? <select className={TS} value={ev.status} onChange={e => setEv({ ...ev, status: e.target.value })}>{STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <span className={"badge " + bad(r.status)}>{SM[r.status] || r.status}</span>}</td><td className="text-center">{ed ? <div className="flex gap-1.5 justify-center"><button onClick={doSave} className="text-[12px] font-semibold hover:opacity-70" style={{ color: "var(--accent)" }}>保存</button><button onClick={ce} className="text-[12px] hover:opacity-70" style={{ color: "var(--t3)" }}>取消</button></div> : <button onClick={() => se(r)} className="text-[12px] font-semibold hover:text-[var(--accent)] transition-colors" style={{ color: "var(--t3)" }}>编辑</button>}</td></tr> })}</tbody></table>
           </div>
         )}
-        <DataStats data={data} cols={[{ key: "staticWater", label: "静水位", decimals: 2 }, { key: "dynamicWater", label: "动水位", decimals: 2 }, { key: "flowRate", label: "流量", decimals: 2 }]} />
+        <DataStats data={data} total={total} stats={stats} cols={[{ key: "staticWater", label: "静水位", decimals: 2 }, { key: "dynamicWater", label: "动水位", decimals: 2 }, { key: "flowRate", label: "流量", decimals: 2 }]} />
         {tp > 1 && <Pagination page={page} totalPages={tp} total={total} pageSize={PS} onChange={setPage} />}
       </div>
     </>}
 
-    {tab === "entry" && <div className="card p-6 rise"><form onSubmit={sub}>
-      <div className="flex items-center gap-2 mb-5">
-        <label className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:bg-[var(--surface-1)] active:scale-[0.97]" style={{ color: "var(--t2)", border: "1px solid var(--border)" }}>📂导入Excel<input type="file" accept=".xlsx,.xls" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (!f) return; try { const XLSX = await import("xlsx"); const T = await import("@/lib/templates"); const d = new Uint8Array(await f.arrayBuffer()); const wb = XLSX.read(d, { type: "array" }); const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }) as any[][]; const rows = raw.filter((r: any[]) => r.some((c: any) => c !== "")); const find = T.colFinder(rows[0]); const A = T.MON_ALIASES; const cell = (r: any[], al: string[]) => { const i = find(al); return i >= 0 ? r[i] : undefined }; const recs = rows.slice(1).map((r: any) => { const rawSt = String(cell(r, A.status) || "").trim(); const status = T.STATUS_ZH2EN[rawSt] || (["normal","abnormal","stopped","abandoned"].includes(rawSt) ? rawSt : "normal"); return { wellId: String(cell(r, A.wellId) || "").trim(), collectDate: cell(r, A.collectDate) || null, staticWater: T.num(cell(r, A.staticWater)), dynamicWater: T.num(cell(r, A.dynamicWater)), wellDepth: T.num(cell(r, A.wellDepth)), flowRate: T.num(cell(r, A.flowRate)), pumpDepth: T.num(cell(r, A.pumpDepth)), pumpFlow: T.num(cell(r, A.pumpFlow)), motorPower: T.num(cell(r, A.motorPower)), manufacturer: cell(r, A.manufacturer) || null, status } }).filter((x: any) => x.wellId); const result = await importMonitorings(recs); if (result.success) { addToast("导入" + result.count + "条", "success"); fetch() } else { addToast("导入失败:" + result.error, "error") } } catch (err: any) { addToast("导入异常:" + (err?.message || ""), "error") } e.target.value = "" }} /></label>
-        <button type="button" onClick={() => { import("@/lib/templates").then(m => m.downloadTemplate(m.MON_TPL, "监测数据导入模板", m.MON_SAMPLE)) }} className="h-9 px-3 rounded-full text-[12px] font-medium border transition-colors hover:bg-[var(--surface-1)]" style={{ color: "var(--t2)", borderColor: "var(--glass-border)" }}>📋 下载模板</button>
-        <div className="flex-1" />
+    {tab === "entry" && <div className="card p-5 rise"><form onSubmit={sub}>
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <label className="import-btn cursor-pointer">📂 导入Excel<input type="file" accept=".xlsx,.xls" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (!f) return; try { const XLSX = await import("xlsx"); const T = await import("@/lib/templates"); const d = new Uint8Array(await f.arrayBuffer()); const wb = XLSX.read(d, { type: "array" }); const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false }) as any[][]; const rows = raw.filter((r: any[]) => r.some((c: any) => c !== "")); const find = T.colFinder(rows[0]); const A = T.MON_ALIASES; const cell = (r: any[], al: string[]) => { const i = find(al); return i >= 0 ? r[i] : undefined }; const recs = rows.slice(1).map((r: any) => { const rawSt = String(cell(r, A.status) || "").trim(); const status = T.STATUS_ZH2EN[rawSt] || (["normal","abnormal","stopped","abandoned"].includes(rawSt) ? rawSt : "normal"); return { wellId: String(cell(r, A.wellId) || "").trim(), collectDate: T.parseDate(cell(r, A.collectDate)), staticWater: T.num(cell(r, A.staticWater)), dynamicWater: T.num(cell(r, A.dynamicWater)), wellDepth: T.num(cell(r, A.wellDepth)), flowRate: T.num(cell(r, A.flowRate)), pumpDepth: T.num(cell(r, A.pumpDepth)), pumpFlow: T.num(cell(r, A.pumpFlow)), motorPower: T.num(cell(r, A.motorPower)), manufacturer: cell(r, A.manufacturer) || null, status } }).filter((x: any) => x.wellId); const result = await importMonitorings(recs); if (result.success) { addToast("导入" + result.count + "条" + (result.skipped ? "，跳过" + result.skipped + "条(井号不存在)" : ""), "success"); fetch() } else { addToast("导入失败:" + result.error, "error") } } catch (err: any) { addToast("导入异常:" + (err?.message || ""), "error") } e.target.value = "" }} /></label>
+        <button type="button" onClick={() => { import("@/lib/templates").then(m => m.downloadTemplate(m.MON_TPL, "监测数据导入模板", m.MON_SAMPLE)) }} className="import-btn">📋 下载模板</button>
         <Button variant="ghost" size="sm" type="button" onClick={cf}>清除</Button>
       </div>
-      <div className="grid grid-cols-2 gap-6">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--t3)", borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>基本信息</div>
-          <div className="relative">
-            <Input label="井号" value={mw} onChange={e => hs(e.target.value)} placeholder="C05001" w="100%" autoComplete="off" />
-            {is.length > 0 && <div className="absolute z-50 top-full left-0 right-0 mt-1 pop" style={{ background: "var(--surface-3)", border: "1px solid var(--glass-border-strong)", borderRadius: "var(--r-md)", boxShadow: "var(--s-lg)", backdropFilter: "blur(20px)" }}>{is.map(id => <div key={id} className="px-3 py-2 text-[12px] hover:bg-[var(--surface-1)] cursor-pointer" style={{ fontFamily: "var(--font-mono)" }} onClick={() => { setMw(id); setIs([]) }}>{id}</div>)}</div>}
-          </div>
-          <div className="flex gap-3">
-            <Select label="井采线" value={ml} onChange={e => { setMl(e.target.value); setMw("") }} options={LINE_OPTS_E} w="100%" />
-            <DateField label="日期" value={md} onChange={v => setMd(v)} w="100%" />
-          </div>
-          <div className="flex gap-3">
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--t3)", display: "block", marginBottom: 4 }}>状态</label>
-              <select value={st} onChange={e => setSt(e.target.value)} style={{ height: 40, padding: "0 12px", borderRadius: "var(--r-sm)", fontSize: 10.5, border: "1px solid var(--glass-border)", background: "var(--surface-1)", color: "var(--t1)", outline: "none", width: "100%" }}>
-                {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <Input label="厂家" value={mf} onChange={e => setMf(e.target.value)} w="100%" />
-          </div>
+      <div className="flex items-end gap-2 overflow-x-auto pb-2" style={{scrollbarWidth:'thin'}}>
+        <div className="relative flex-shrink-0"><Input label="井号" value={mw} onChange={e => hs(e.target.value)} onBlur={() => { if (mw) fillFromLast(mw) }} placeholder="C05001" w={105} autoComplete="off" />{is.length > 0 && <div className="absolute z-50 top-full left-0 right-0 mt-1 pop" style={{ background: "var(--surface-3)", border: "1px solid var(--glass-border-strong)", borderRadius: "var(--r-md)", boxShadow: "var(--s-lg)", backdropFilter: "blur(20px)" }}>{is.map(id => <div key={id} className="px-3 py-2 text-[12px] hover:bg-[var(--surface-1)] cursor-pointer" style={{ fontFamily: "var(--font-mono)" }} onClick={() => { setMw(id); setIs([]) }}>{id}</div>)}</div>}</div>
+        <Input label="日期" value={md} onChange={e => setMd(e.target.value)} placeholder="2024-02-28" w={115} />
+        <Input label="静水位" value={sw} onChange={e => setSw(e.target.value)} onBlur={() => { an(sw, setSw) }} w={85} />
+        <Input label="动水位" value={dw} onChange={e => setDw(e.target.value)} onBlur={() => { an(dw, setDw) }} w={85} />
+        <Input label="井深" value={wd} onChange={e => setWd(e.target.value)} w={75} />
+        <Input label="流量" value={fr} onChange={e => setFr(e.target.value)} w={80} />
+        <Input label="泵深" value={pd} onChange={e => setPd(e.target.value)} onBlur={() => { an(pd, setPd) }} w={80} />
+        <Input label="泵量" value={pf} onChange={e => setPf(e.target.value)} w={80} />
+        <Input label="电机" value={mp} onChange={e => setMp(e.target.value)} w={80} />
+        <Input label="厂家" value={mf} onChange={e => setMf(e.target.value)} w={90} />
+        <div className="flex-shrink-0" style={{width:80}}>
+          <label className="text-[11px] font-medium block mb-2" style={{ color: "var(--t3)" }}>状态</label>
+          <select value={st} onChange={e => setSt(e.target.value)} className="dp-select" style={{height:34,width:'100%',colorScheme:'dark'}}>{STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--t3)", borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 12 }}>水位数据</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="静水位 m" value={sw} onChange={e => setSw(e.target.value)} onBlur={() => an(sw, setSw)} placeholder="-15.00" />
-              <Input label="动水位 m" value={dw} onChange={e => setDw(e.target.value)} onBlur={() => an(dw, setDw)} placeholder="-20.00" />
-              <Input label="井深 m" value={wd} onChange={e => setWd(e.target.value)} placeholder="30" />
-              <Input label="流量 m3/h" value={fr} onChange={e => setFr(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--t3)", borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 12 }}>泵参数</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-              <Input label="泵深 m" value={pd} onChange={e => setPd(e.target.value)} onBlur={() => an(pd, setPd)} placeholder="-50" />
-              <Input label="泵量 m3/h" value={pf} onChange={e => setPf(e.target.value)} />
-              <Input label="电机 kW" value={mp} onChange={e => setMp(e.target.value)} />
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, borderTop: "1px solid var(--border)", gridColumn: "1/-1", marginTop: 4 }}>
-          <Button variant="primary" size="sm" type="submit">提交</Button>
-          <label className="flex items-center gap-1.5 text-[12px] cursor-pointer select-none" style={{ color: "var(--t2)" }}>
-            <input type="checkbox" checked={contEntry} onChange={e => setContEntry(e.target.checked)} className="w-3.5 h-3.5" />连续录入
-          </label>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 10, color: "var(--t4)" }}>Ctrl+Enter 提交 · Esc 取消</span>
-        </div>
-      </div>{st === "abnormal" && <div className="mt-3"><Input label="异常说明" value={fn} onChange={e => setFn(e.target.value)} placeholder="描述异常原因..." w={320} /></div>}
+        <label className="flex items-center gap-1 text-[11px] cursor-pointer whitespace-nowrap self-end mb-2 flex-shrink-0" style={{ color: "var(--t2)" }}><input type="checkbox" checked={contEntry} onChange={e => setContEntry(e.target.checked)} className="w-3.5 h-3.5" />连续录入</label>
+        <Button variant="primary" size="sm" type="submit" className="flex-shrink-0" loading={submitting}>提交</Button>
+      </div>
+      {st === "abnormal" && <div className="mt-3"><Input label="异常说明" value={fn} onChange={e => setFn(e.target.value)} placeholder="描述异常原因..." w={280} /></div>}
     </form></div>
 }
     {delOpen && <ConfirmModal title="确认删除" message={"确定删除" + sel.size + "条监测记录？"} onConfirm={doDel} onCancel={() => setDelOpen(false)} />}

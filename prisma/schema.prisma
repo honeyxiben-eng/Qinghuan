@@ -1,4 +1,4 @@
-﻿generator client {
+generator client {
   provider = "prisma-client-js"
 }
 
@@ -78,5 +78,21 @@ model MaintenanceRecord {
   handler     String?
   description String?
   well        WellInfo @relation(fields: [wellId], references: [wellId])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  oldValues  String?
+  newValues  String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
 }
 

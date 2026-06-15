@@ -47,8 +47,51 @@ export async function getIonRanking(m: string) { return safe(() => svc("analysis
 export async function getLineScoring(m: string) { return safe(() => svc("analysis", "getLineScoring", m)) }
 export async function getPrevMonthData(lineId: number) { return safe(() => svc("analysis", "getPrevMonthData", lineId)) }
 export async function getWellTrend(wellId: string) { return safe(() => svc("analysis", "getWellTrend", wellId)) }
+export async function getWellWaterTrend(wellId: string) { return safe(() => svc("analysis", "getWellWaterTrend", wellId)) }
 export async function getWellsWithLab() { return safe(() => svc("analysis", "getWellsWithLab")) }
 export async function getLiLowWells(m: string) { return safe(() => svc("analysis", "getLiLowWells", m)) }
 export async function getMgLiRatio(m: string) { return safe(() => svc("analysis", "getMgLiRatio", m)) }
 export async function getKLiRatioRank(m: string) { return safe(() => svc("analysis", "getKLiRatioRank", m)) }
 export async function getAdjacentMonths(type: "monitoring" | "lab", current: string) { return safe(() => svc("analysis", "getAdjacentMonths", type, current)) }
+
+export async function getLabMonths() {
+  return safe(async () => {
+    const { all } = await import("@/server/db")
+    return all<{ mo: string }>("SELECT DISTINCT strftime('%Y-%m',testDate) as mo FROM LabData WHERE testDate IS NOT NULL ORDER BY mo DESC")
+  })
+}
+
+export async function getMonthDataForLine(lineId: number, month: string) {
+  return safe(async () => {
+    const { all } = await import("@/server/db")
+    const data = all("SELECT wi.wellId,ld.kPlus,ld.liPlus FROM WellInfo wi JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE wi.lineId=? ORDER BY wi.wellId", [month, lineId])
+    return { prevMonth: month, data }
+  })
+}
+
+export async function getCurrentDataMonth() {
+  return safe(async () => {
+    const { one } = await import("@/server/db")
+    const r = one<{ mo: string }>("SELECT strftime('%Y-%m',testDate) as mo FROM LabData ORDER BY testDate DESC LIMIT 1")
+    return r?.mo || null
+  })
+}
+
+export async function getAuditLogs(o?: any) { return safe(() => svc("audit", "getAuditLogs", o)) }
+
+export async function getLastRecord(wellId: string, type: 'monitoring' | 'lab') {
+  return safe(async () => {
+    const { one } = await import("@/server/db")
+    if (type === 'monitoring') {
+      return one(
+        'SELECT * FROM DynamicMonitoring WHERE wellId = ? ORDER BY collectDate DESC LIMIT 1',
+        [wellId]
+      ) || null
+    } else {
+      return one(
+        'SELECT * FROM LabData WHERE wellId = ? ORDER BY testDate DESC LIMIT 1',
+        [wellId]
+      ) || null
+    }
+  })
+}

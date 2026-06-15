@@ -25,20 +25,20 @@ export default function Pagination({ page, totalPages, total, pageSize, onChange
       <span className="mr-3 tabular-nums">{start}{'\u2013'}{end}/{total}</span>
 
       <button onClick={() => onChange(1)} disabled={page === 1}
-        className="w-8 h-8 rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
+        className="w-[34px] h-[34px] rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
         title={'\u9996\u9875'}>
         <ChevronFirst size={14} />
       </button>
 
       <button onClick={() => onChange(Math.max(1, page - 1))} disabled={page === 1}
-        className="w-8 h-8 rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
+        className="w-[34px] h-[34px] rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
         title={'\u4e0a\u4e00\u9875'}>
         <ChevronLeft size={14} />
       </button>
 
       {pages.map(n => (
         <button key={n} onClick={() => onChange(n)}
-          className="min-w-[32px] h-[32px] rounded-[var(--r-sm)] flex items-center justify-center transition-all font-semibold tabular-nums"
+          className="min-w-[34px] h-[34px] rounded-[var(--r-sm)] flex items-center justify-center transition-all font-semibold tabular-nums"
           style={{
             background: n === page ? 'var(--accent)' : undefined,
             color: n === page ? '#fff' : 'var(--t2)',
@@ -48,13 +48,13 @@ export default function Pagination({ page, totalPages, total, pageSize, onChange
       ))}
 
       <button onClick={() => onChange(Math.min(totalPages, page + 1))} disabled={page === totalPages}
-        className="w-8 h-8 rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
+        className="w-[34px] h-[34px] rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
         title={'\u4e0b\u4e00\u9875'}>
         <ChevronRight size={14} />
       </button>
 
       <button onClick={() => onChange(totalPages)} disabled={page === totalPages}
-        className="w-8 h-8 rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
+        className="w-[34px] h-[34px] rounded-[var(--r-sm)] flex items-center justify-center hover:bg-[var(--surface-1)] disabled:opacity-20 transition-all"
         title={'\u672b\u9875'}>
         <ChevronLast size={14} />
       </button>

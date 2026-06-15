@@ -10,7 +10,7 @@ export default function NotFound() {
       <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 28, maxWidth: 360 }}>
         您访问的页面不存在或已被移除
       </p>
-      <a href="/" className="btn btn-primary">
+      <a href="/" className="btn btn-v-primary">
         返回中控台
       </a>
     </div>

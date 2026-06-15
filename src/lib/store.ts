@@ -1,6 +1,6 @@
 'use client'
 import { create } from 'zustand'
-import type { UserRole } from '@/types'
+import type { UserRole } from '@/shared/types'
 
 function sc(n: string, v: string, d = 7) {
   if (typeof document === 'undefined') return

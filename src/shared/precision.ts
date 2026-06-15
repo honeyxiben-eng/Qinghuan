@@ -66,18 +66,42 @@ export function toNegative(v: number, key: PrecisionKey): number {
   return round(n, spec.decimals)
 }
 
-/** 统一日期格式化为 YYYY-MM-DD */
+/** 统一日期格式化为 YYYY-MM-DD，兼容 Excel 序列号 */
 export function fmtDate(v: unknown): string {
-  if (!v) return '—'
+  if (v === null || v === undefined || v === '') return '—'
   try {
+    // Date 对象
     if (v instanceof Date) {
       if (Number.isNaN(v.getTime())) return '—'
       return v.toISOString().slice(0, 10)
     }
+    // 数字：Excel 日期序列号 (epoch: 1899-12-30)
+    if (typeof v === 'number' && v > 1000 && v < 100000) {
+      const excelEpoch = Date.UTC(1899, 11, 30)
+      const d = new Date(excelEpoch + v * 86400000)
+      if (!Number.isNaN(d.getTime())) {
+        const y = d.getUTCFullYear()
+        if (y >= 2010 && y <= 2099) {
+          return `${y}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+        }
+      }
+      return String(v).slice(0, 10)
+    }
     const s = String(v).trim()
     if (!s) return '—'
+    // 中文格式
+    const cn = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/)
+    if (cn) return `${cn[1]}-${cn[2].padStart(2, '0')}-${cn[3].padStart(2, '0')}`
+    // 标准日期字符串
     const d = new Date(s.includes('/') ? s.replace(/\//g, '-') : s)
-    return Number.isNaN(d.getTime()) ? (s.slice(0, 10) || '—') : d.toISOString().slice(0, 10)
+    if (!Number.isNaN(d.getTime())) {
+      const y = d.getFullYear()
+      if (y >= 2010 && y <= 2099) {
+        return `${y}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      }
+    }
+    // 退化为截断
+    return s.slice(0, 10) || '—'
   } catch {
     return '—'
   }

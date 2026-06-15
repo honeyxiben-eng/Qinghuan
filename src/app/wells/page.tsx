@@ -2,9 +2,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { WELL_LINES, REGIONS } from "@/lib/well-data"
 import { getWells, createWell, updateWell, deleteWells, importWells } from "@/app/actions"
-import { fmt, fmtDate, P } from "@/lib/precision"
+import { fmt, fmtDate, P } from "@/shared/precision"
 import { addToast } from "@/components/ui/Toast"
-import { exportXLSX } from "@/lib/export"
+import { exportXLSX, exportCSV } from "@/lib/export"
 import { wellCreateSchema } from "@/shared/validation"
 
 import Button from "@/components/ui/Button"
@@ -12,6 +12,7 @@ import DataStats from "@/components/ui/DataStats"
 import Input from "@/components/ui/Input"
 import Select from "@/components/ui/Select"
 import Pagination from "@/components/ui/Pagination"
+import EmptyState, { EmptyWellIcon } from "@/components/ui/EmptyState"
 
 import ConfirmModal from "@/components/ui/ConfirmModal"
 import DateField from "@/components/ui/DateField"
@@ -33,10 +34,12 @@ export default function WellsPage() {
   const [search, setSearch] = useState(""); const [region, setRegion] = useState(""); const [line, setLine] = useState("")
   const [page, setPage] = useState(1); const [sel, setSel] = useState(new Set<string>()); const [delOpen, setDelOpen] = useState(false)
   const [edId, setEdId] = useState<string | null>(null); const [ev, setEv] = useState<any>({})
-  const [data, setData] = useState<any[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false)
+  const [data, setData] = useState<any[]>([]); const [total, setTotal] = useState(0); const [stats, setStats] = useState<any>(null); const [loading, setLoading] = useState(false)
   const [flashId, setFlashId] = useState(""); const [sortKey, setSortKey] = useState(""); const [sortDir, setSortDir] = useState(1)
-  const [contEntry, setContEntry] = useState(false)
+  const [contEntry, setContEntry] = useState(false); const [submitting, setSubmitting] = useState(false)
   const wRef = useRef<HTMLInputElement>(null)
+  const editRefs = useRef<(HTMLInputElement | HTMLSelectElement)[]>([])
+  const EDIT_FIELD_COUNT = 8 // completionDate, technology, techNote, wellSize, initialWaterLevel, designDepth, coordX, coordY
 
   const [ew, setEw] = useState(""); const [el, setEl] = useState(""); const [ed, setEd] = useState(""); const [et, setEt] = useState("裸孔")
   const [es, setEs] = useState("1200"); const [ewl, setEwl] = useState(""); const [edp, setEdp] = useState("")
@@ -46,7 +49,7 @@ export default function WellsPage() {
   const sw = (v: string) => { const cn = WELL_LINES.filter(l => l.name.includes(v) || l.shortName.toLowerCase().includes(v.toLowerCase())); const r: string[] = []; for (const l of cn) { const ln = l as any; if (ln.numbers) for (const n of ln.numbers) r.push(ln.prefix + String(n).padStart(3, "0")) } return r }
 
   const fetchRef = useRef<() => void>(() => {})
-  fetchRef.current = () => { setLoading(true); getWells({ region: region || undefined, lineId: line ? WELL_LINES.find(l => l.shortName === line)?.id : undefined, search: search || undefined, page, pageSize: PS }).then((r: any) => { setData(r.data); setTotal(r.total) }).finally(() => setLoading(false)) }
+  fetchRef.current = () => { setLoading(true); getWells({ region: region || undefined, lineId: line ? WELL_LINES.find(l => l.shortName === line)?.id : undefined, search: search || undefined, page, pageSize: PS }).then((r: any) => { setData(r.data); setTotal(r.total); setStats(r.stats || null) }).finally(() => setLoading(false)) }
   const fetch = useCallback(() => fetchRef.current(), [])
   useEffect(() => { document.title = "清欢 · 基础信息"; fetch() }, [region, line, page])
   useEffect(() => { const t = setTimeout(fetch, 300); return () => clearTimeout(t) }, [search])
@@ -55,16 +58,34 @@ export default function WellsPage() {
   const ta = () => setSel(sel.size === data.length && data.length > 0 ? new Set() : new Set(data.map((w: any) => w.wellId)))
   const to = (id: string) => { const n = new Set(sel); n.has(id) ? n.delete(id) : n.add(id); setSel(n) }
   const doDel = async () => { try { await deleteWells(Array.from(sel)); addToast("已删除" + sel.size + "条", "success"); setSel(new Set()); setDelOpen(false); setPage(1); fetch() } catch (e: any) { addToast("删除失败:" + e.message, "error") } }
-  const doExp = async () => { try { const all = await getWells({ region: region || undefined, lineId: line ? WELL_LINES.find(l => l.shortName === line)?.id : undefined, search: search || undefined, pageSize: 99999 }); const rows = (all as any).data || []; if (!rows.length) { addToast("无数据可导出", "warning"); return }; exportXLSX("基础信息", ["井号", "井采线", "片区", "成井时间", "工艺", "备注", "尺寸", "初始水位", "井深", "坐标X", "坐标Y"], rows.map((r: any) => [r.wellId, r.lineName || "--", RNAMES[r.region] || "--", fmtDate(r.completionDate), r.technology || "--", r.techNote || "--", r.wellSize || "--", fmt(r.initialWaterLevel, P.WATER), fmt(r.designDepth, P.WELL_DEPTH), fmt(r.coordX, P.COORD), fmt(r.coordY, P.COORD)])); addToast("已导出 " + rows.length + " 条", "success") } catch (e: any) { addToast("导出失败: " + e.message, "error") } }
+  const doExp = async () => { try { const all = await getWells({ region: region || undefined, lineId: line ? WELL_LINES.find(l => l.shortName === line)?.id : undefined, search: search || undefined, pageSize: 99999 }); const rows = (all as any).data || []; if (!rows.length) { addToast("无数据可导出", "warning"); return }; exportXLSX({ filename: "基础信息", headers: ["井号", "井采线", "片区", "成井时间", "工艺", "备注", "尺寸", "初始水位", "井深", "坐标X", "坐标Y"], rows: rows.map((r: any) => [r.wellId, r.lineName || "--", RNAMES[r.region] || "--", fmtDate(r.completionDate), r.technology || "--", r.techNote || "--", r.wellSize || "--", fmt(r.initialWaterLevel, P.WATER), fmt(r.designDepth, P.WELL_DEPTH), fmt(r.coordX, P.COORD), fmt(r.coordY, P.COORD)]) }); addToast("已导出 " + rows.length + " 条", "success") } catch (e: any) { addToast("导出失败: " + e.message, "error") } }
+  const doExpCSV = async () => { try { const all = await getWells({ region: region || undefined, lineId: line ? WELL_LINES.find(l => l.shortName === line)?.id : undefined, search: search || undefined, pageSize: 99999 }); const rows = (all as any).data || []; if (!rows.length) { addToast("无数据可导出", "warning"); return } exportCSV("基础信息", ["井号", "井采线", "片区", "成井时间", "工艺", "备注", "尺寸", "初始水位", "井深", "坐标X", "坐标Y"], rows.map((r: any) => [r.wellId, r.lineName || "--", RNAMES[r.region] || "--", fmtDate(r.completionDate), r.technology || "--", r.techNote || "--", r.wellSize || "--", fmt(r.initialWaterLevel, P.WATER), fmt(r.designDepth, P.WELL_DEPTH), fmt(r.coordX, P.COORD), fmt(r.coordY, P.COORD)])); addToast("CSV 已导出", "success") } catch (e: any) { addToast("导出失败: " + e.message, "error") } }
   const se = (w: any) => { setEdId(w.wellId); setEv({ completionDate: w.completionDate || "", technology: w.technology || "裸孔", techNote: w.techNote || "", wellSize: w.wellSize || "1200", initialWaterLevel: w.initialWaterLevel != null ? Number(w.initialWaterLevel).toFixed(2) : "", designDepth: w.designDepth != null ? Number(w.designDepth).toFixed(2) : "", coordX: w.coordX != null ? Number(w.coordX).toFixed(2) : "", coordY: w.coordY != null ? Number(w.coordY).toFixed(2) : "" }) }
   const evRef = useRef(ev); evRef.current = ev; const idRef = useRef(edId); idRef.current = edId
   const ce = useCallback(() => { setEdId(null); setEv({}) }, [])
   const doSave = useCallback(async () => { const id = idRef.current; if (!id) return; try { const v = evRef.current; await updateWell(id, { completionDate: v.completionDate || undefined, technology: v.technology, techNote: v.techNote || undefined, wellSize: v.wellSize, initialWaterLevel: v.initialWaterLevel ? parseFloat(v.initialWaterLevel) : undefined, designDepth: v.designDepth ? parseFloat(v.designDepth) : undefined, coordX: v.coordX ? parseFloat(v.coordX) : undefined, coordY: v.coordY ? parseFloat(v.coordY) : undefined }); setFlashId(id); setTimeout(() => setFlashId(""), 600); addToast("已更新", "success"); setEdId(null); setEv({}); fetch() } catch (e: any) { addToast("更新失败:" + e.message, "error") } }, [fetch])
-  useEffect(() => { if (!edId) return; const h = (e: KeyboardEvent) => { if (e.key === "Escape") ce(); if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSave() } }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h) }, [edId, ce, doSave])
+  useEffect(() => {
+    if (!edId) return
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") ce()
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSave() }
+      if (e.key === "Tab") {
+        e.preventDefault()
+        const current = editRefs.current.indexOf(e.target as any)
+        if (current >= 0) {
+          const next = e.shiftKey ? current - 1 : current + 1
+          if (next >= 0 && next < EDIT_FIELD_COUNT) editRefs.current[next]?.focus()
+        }
+      }
+    }
+    window.addEventListener("keydown", h)
+    return () => window.removeEventListener("keydown", h)
+  }, [edId, ce, doSave])
   const hs = (v: string) => { setEw(v.toUpperCase()); const pool = allIds; const cn = sw(v); const all = [...new Set([...pool.filter(id => id.toUpperCase().includes(v.toUpperCase())), ...cn])]; setEsg(v.length >= 1 ? all.slice(0, 8) : []) }
   const cf = () => { setEw(""); setEl(""); setEd(""); setEt("裸孔"); setEs("1200"); setEwl(""); setEdp(""); setEx(""); setEy(""); setEtn(""); setEsg([]) }
-  const sub = async (e: React.FormEvent) => { e.preventDefault(); if (!ew) { addToast("请填写井号", "warning"); return } const vResult = wellCreateSchema.safeParse({ wellId: ew, lineId: WELL_LINES.find(l => l.shortName === el)?.id || 0, completionDate: ed || undefined, technology: et, techNote: etn || undefined, wellSize: es, initialWaterLevel: ewl ? parseFloat(ewl) : undefined, designDepth: edp ? parseFloat(edp) : undefined, coordX: ex ? parseFloat(ex) : undefined, coordY: ey ? parseFloat(ey) : undefined }); if (!vResult.success) { addToast(vResult.error.issues[0].message, "warning"); return } try { await createWell(vResult.data); addToast("录入成功", "success"); if (contEntry) { cf(); setTimeout(() => wRef.current?.focus(), 100) } else { cf() } fetch() } catch (e: any) { addToast("录入失败:" + e.message, "error") } }
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.ctrlKey && e.key === "Enter" && tab === "entry") { e.preventDefault(); sub(e as any) } }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h) }, [tab, contEntry, ew, el, ed, et, es, ewl, edp, ex, ey, etn])
+  const sub = async (e: React.FormEvent | KeyboardEvent) => { e.preventDefault(); if (submitting) return; if (!ew) { addToast("请填写井号", "warning"); return } const vResult = wellCreateSchema.safeParse({ wellId: ew, lineId: WELL_LINES.find(l => l.shortName === el)?.id || 0, completionDate: ed || undefined, technology: et, techNote: etn || undefined, wellSize: es, initialWaterLevel: ewl ? parseFloat(ewl) : undefined, designDepth: edp ? parseFloat(edp) : undefined, coordX: ex ? parseFloat(ex) : undefined, coordY: ey ? parseFloat(ey) : undefined }); if (!vResult.success) { addToast(vResult.error.issues[0].message, "warning"); return } setSubmitting(true); try { await createWell(vResult.data); addToast("录入成功", "success"); if (contEntry) { cf(); setTimeout(() => wRef.current?.focus(), 100) } else { cf() } fetch() } catch (e: any) { addToast("录入失败:" + e.message, "error") } finally { setSubmitting(false) } }
+  const subRef = useRef(sub); subRef.current = sub
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); subRef.current(e) } }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h) }, [])
   const sortData = (d: any[]) => { if (!sortKey) return d; return [...d].sort((a, b) => { const va = a[sortKey] ?? ""; const vb = b[sortKey] ?? ""; return (va > vb ? 1 : -1) * sortDir }) }
   const toggleSort = (k: string) => { if (sortKey === k) setSortDir(-sortDir); else { setSortKey(k); setSortDir(1) } }
   const sorted = sortData(data)
@@ -97,7 +118,8 @@ export default function WellsPage() {
           </button>
         ))}
         <div className="flex-1" />
-        <Button variant="secondary" size="sm" onClick={doExp} disabled={!data.length}><Download size={12} className="mr-1" />导出</Button>
+        <Button variant="secondary" size="sm" onClick={doExp} disabled={!data.length}><Download size={12} className="mr-1" />Excel</Button>
+        <Button variant="secondary" size="sm" onClick={doExpCSV} disabled={!data.length}>CSV</Button>
         <Button variant="danger" size="sm" onClick={() => { if (sel.size === 0) { addToast("请先选择", "warning"); return } setDelOpen(true) }} disabled={sel.size === 0}>删除{sel.size > 0 ? `(${sel.size})` : ""}</Button>
       </div>
 
@@ -106,7 +128,12 @@ export default function WellsPage() {
         {loading && data.length === 0 ? (
           <div className="py-16 flex justify-center"><div className="w-6 h-6 border-[3px] border-[var(--accent)] border-t-transparent rounded-full animate-spin" /></div>
         ) : data.length === 0 ? (
-          <div className="py-16 text-center"><p className="text-[13px]" style={{ color: "var(--t2)" }}>暂无数据</p><Button variant="primary" size="sm" onClick={() => setTab("entry")} className="mt-3">立即录入</Button></div>
+          <EmptyState
+            icon={<EmptyWellIcon />}
+            title="暂无井数据"
+            description="点击上方按钮开始录入井基础信息"
+            action={<Button variant="primary" size="sm" onClick={() => setTab("entry")}>立即录入</Button>}
+          />
         ) : (
           /* Table View */
           <div className="overflow-x-auto">
@@ -123,8 +150,8 @@ export default function WellsPage() {
                   <th className="w-18 py-1 font-semibold text-center" style={{ color: "var(--t3)" }}>工艺</th>
                   <th className="w-16 py-1 font-semibold text-center" style={{ color: "var(--t3)" }}>备注</th>
                   <th className="w-16 py-1 font-semibold text-center" style={{ color: "var(--t3)" }}>尺寸</th>
-                  <th className="w-20 py-1 font-semibold text-center cursor-pointer hover:text-[var(--accent)]" style={{ color: "var(--t3)" }} onClick={() => toggleSort("initialWaterLevel")}>初始水位{sortKey === "initialWaterLevel" ? (sortDir > 0 ? "—" : "—") : ""}</th>
-                  <th className="w-18 py-1 font-semibold text-center cursor-pointer hover:text-[var(--accent)]" style={{ color: "var(--t3)" }} onClick={() => toggleSort("designDepth")}>井深{sortKey === "designDepth" ? (sortDir > 0 ? "—" : "—") : ""}</th>
+                  <th className={`w-20 py-1 font-semibold text-center cursor-pointer hover:text-[var(--accent)] ${sortKey === "initialWaterLevel" ? (sortDir > 0 ? "sort-asc" : "sort-desc") : ""}`} style={{ color: "var(--t3)" }} onClick={() => toggleSort("initialWaterLevel")}>初始水位</th>
+                  <th className={`w-18 py-1 font-semibold text-center cursor-pointer hover:text-[var(--accent)] ${sortKey === "designDepth" ? (sortDir > 0 ? "sort-asc" : "sort-desc") : ""}`} style={{ color: "var(--t3)" }} onClick={() => toggleSort("designDepth")}>井深</th>
                   <th className="w-20 py-1 font-semibold text-center" style={{ color: "var(--t3)" }}>坐标X</th>
                   <th className="w-20 py-1 font-semibold text-center" style={{ color: "var(--t3)" }}>坐标Y</th>
                   <th className="w-16 py-1 font-semibold text-center" style={{ color: "var(--t3)" }}>操作</th>
@@ -139,14 +166,14 @@ export default function WellsPage() {
                     <td className="text-center font-semibold" style={{ fontFamily: "var(--font-mono)", color: "var(--t1)" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", marginRight: 6, verticalAlign: "middle", background: REGION_DOTS[w.region] || "var(--t4)" }} />{hi(w.wellId, search)}</td>
                     <td className="text-center" style={{ color: "var(--t1)" }}>{w.lineName || "—"}</td>
                     <td className="text-center" style={{ color: "var(--t2)" }}>{RNAMES[w.region] || "—"}</td>
-                    <td className="text-center" style={{ color: "var(--t1)" }}>{fmtDate(w.completionDate)}</td>
-                    <td className="text-center">{ed ? <select className={TS} value={ev.technology} onChange={e => setEv({ ...ev, technology: e.target.value })}>{TECHS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <span style={{ color: "var(--t1)" }}>{w.technology || "—"}</span>}</td>
-                    <td className="text-center">{ed ? <input className={TI} value={ev.techNote} onChange={e => setEv({ ...ev, techNote: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{w.techNote || "—"}</span>}</td>
-                    <td className="text-center">{ed ? <select className={TS} value={ev.wellSize} onChange={e => setEv({ ...ev, wellSize: e.target.value })}>{SIZES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <span style={{ color: "var(--t1)" }}>{w.wellSize || "—"}</span>}</td>
-                    <td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.initialWaterLevel} onChange={e => setEv({ ...ev, initialWaterLevel: e.target.value })} onBlur={() => { const n = parseFloat(ev.initialWaterLevel); if (!isNaN(n) && n > 0) setEv({ ...ev, initialWaterLevel: String(Math.round(-n * 100) / 100) }) }} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.initialWaterLevel, P.WATER)}</span>}</td>
-                    <td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.designDepth} onChange={e => setEv({ ...ev, designDepth: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.designDepth, P.WELL_DEPTH)}</span>}</td>
-                    <td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.coordX} onChange={e => setEv({ ...ev, coordX: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.coordX, P.COORD)}</span>}</td>
-                    <td className="text-center tabular-nums">{ed ? <input className={TI} value={ev.coordY} onChange={e => setEv({ ...ev, coordY: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.coordY, P.COORD)}</span>}</td>
+                    <td className="text-center" style={{ color: "var(--t1)" }}>{ed ? <input ref={el => { if (el) editRefs.current[0] = el }} type="date" className={TI} value={ev.completionDate} onChange={e => setEv({ ...ev, completionDate: e.target.value })} /> : fmtDate(w.completionDate)}</td>
+                    <td className="text-center">{ed ? <select ref={el => { if (el) editRefs.current[1] = el }} className={TS} value={ev.technology} onChange={e => setEv({ ...ev, technology: e.target.value })}>{TECHS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <span style={{ color: "var(--t1)" }}>{w.technology || "—"}</span>}</td>
+                    <td className="text-center">{ed ? <input ref={el => { if (el) editRefs.current[2] = el }} className={TI} value={ev.techNote} onChange={e => setEv({ ...ev, techNote: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{w.techNote || "—"}</span>}</td>
+                    <td className="text-center">{ed ? <select ref={el => { if (el) editRefs.current[3] = el }} className={TS} value={ev.wellSize} onChange={e => setEv({ ...ev, wellSize: e.target.value })}>{SIZES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <span style={{ color: "var(--t1)" }}>{w.wellSize || "—"}</span>}</td>
+                    <td className="text-center tabular-nums">{ed ? <input ref={el => { if (el) editRefs.current[4] = el }} className={TI} value={ev.initialWaterLevel} onChange={e => setEv({ ...ev, initialWaterLevel: e.target.value })} onBlur={() => { const n = parseFloat(ev.initialWaterLevel); if (!isNaN(n) && n > 0) setEv({ ...ev, initialWaterLevel: String(Math.round(-n * 100) / 100) }) }} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.initialWaterLevel, P.WATER)}</span>}</td>
+                    <td className="text-center tabular-nums">{ed ? <input ref={el => { if (el) editRefs.current[5] = el }} className={TI} value={ev.designDepth} onChange={e => setEv({ ...ev, designDepth: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.designDepth, P.WELL_DEPTH)}</span>}</td>
+                    <td className="text-center tabular-nums">{ed ? <input ref={el => { if (el) editRefs.current[6] = el }} className={TI} value={ev.coordX} onChange={e => setEv({ ...ev, coordX: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.coordX, P.COORD)}</span>}</td>
+                    <td className="text-center tabular-nums">{ed ? <input ref={el => { if (el) editRefs.current[7] = el }} className={TI} value={ev.coordY} onChange={e => setEv({ ...ev, coordY: e.target.value })} /> : <span style={{ color: "var(--t1)" }}>{fmt(w.coordY, P.COORD)}</span>}</td>
                     <td className="text-center">{ed ? <div className="flex gap-1.5 justify-center"><button onClick={doSave} className="text-[12px] font-semibold hover:opacity-70" style={{ color: "var(--accent)" }}>保存</button><button onClick={ce} className="text-[12px] hover:opacity-70" style={{ color: "var(--t3)" }}>取消</button></div> : <button onClick={() => se(w)} className="text-[12px] font-semibold hover:text-[var(--accent)] transition-colors" style={{ color: "var(--t3)" }}>编辑</button>}</td>
                   </tr>
                 })}
@@ -154,32 +181,30 @@ export default function WellsPage() {
             </table>
           </div>
         )}
-        <DataStats data={data} cols={[{ key: "initialWaterLevel", label: "水位", decimals: 2 }, { key: "designDepth", label: "井深", decimals: 2 }]} />
+        <DataStats data={data} total={total} stats={stats} cols={[{ key: "initialWaterLevel", label: "水位", decimals: 2 }, { key: "designDepth", label: "井深", decimals: 2 }]} />
         {tp > 1 && <Pagination page={page} totalPages={tp} total={total} pageSize={PS} onChange={setPage} />}
       </div>
     </>}
 
-    {tab === "entry" && <div className="card p-7 rise"><form onSubmit={sub}>
-      <div className="flex items-center gap-2 mb-5">
-        <label className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:bg-[var(--surface-1)] active:scale-[0.97]" style={{ color: "var(--t2)", border: "1px solid var(--glass-border)" }}>📥导入Excel<input type="file" accept=".xlsx,.xls" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (!f) return; try { const XLSX = await import("xlsx"); const T = await import("@/lib/templates"); const d = new Uint8Array(await f.arrayBuffer()); const wb = XLSX.read(d, { type: "array" }); const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }) as any[][]; const rows = raw.filter((r: any[]) => r.some((c: any) => c !== "")); const find = T.colFinder(rows[0]); const A = T.WELL_ALIASES; const cell = (r: any[], al: string[]) => { const i = find(al); return i >= 0 ? r[i] : undefined }; const recs = rows.slice(1).map((r: any) => ({ wellId: String(cell(r, A.wellId) || "").trim(), shortName: cell(r, A.shortName) || "", completionDate: cell(r, A.completionDate) || null, technology: cell(r, A.technology) || "裸孔", techNote: cell(r, A.techNote) || null, wellSize: cell(r, A.wellSize) || "1200", initialWaterLevel: T.num(cell(r, A.initialWaterLevel)), designDepth: T.num(cell(r, A.designDepth)), coordX: T.num(cell(r, A.coordX)), coordY: T.num(cell(r, A.coordY)) })).filter((x: any) => x.wellId); const result = await importWells(recs); if (result.success) { addToast("导入" + result.count + "—", "success"); fetch() } else { addToast("导入失败:" + result.error, "error") } } catch (err: any) { addToast("导入异常:" + (err?.message || ""), "error") } e.target.value = "" }} /></label>
-        <button type="button" onClick={() => { import("@/lib/templates").then(m => m.downloadTemplate(m.WELL_TPL, "基础信息导入模板", m.WELL_SAMPLE)) }} className="h-9 px-3 rounded-full text-[12px] font-medium border transition-colors hover:bg-[var(--surface-1)]" style={{ color: "var(--t2)", borderColor: "var(--glass-border)" }}>📋 下载模板</button>
-
-        <div className="flex-1" />
+    {tab === "entry" && <div className="card p-5 rise"><form onSubmit={sub}>
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <label className="import-btn cursor-pointer">📥 导入Excel<input type="file" accept=".xlsx,.xls" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (!f) return; try { const XLSX = await import("xlsx"); const T = await import("@/lib/templates"); const d = new Uint8Array(await f.arrayBuffer()); const wb = XLSX.read(d, { type: "array" }); const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false }) as any[][]; const rows = raw.filter((r: any[]) => r.some((c: any) => c !== "")); const find = T.colFinder(rows[0]); const A = T.WELL_ALIASES; const cell = (r: any[], al: string[]) => { const i = find(al); return i >= 0 ? r[i] : undefined }; const recs = rows.slice(1).map((r: any) => ({ wellId: String(cell(r, A.wellId) || "").trim(), shortName: cell(r, A.shortName) || "", completionDate: T.parseDate(cell(r, A.completionDate)), technology: cell(r, A.technology) || "裸孔", techNote: cell(r, A.techNote) || null, wellSize: cell(r, A.wellSize) || "1200", initialWaterLevel: T.num(cell(r, A.initialWaterLevel)), designDepth: T.num(cell(r, A.designDepth)), coordX: T.num(cell(r, A.coordX)), coordY: T.num(cell(r, A.coordY)) })).filter((x: any) => x.wellId); const result = await importWells(recs); if (result.success) { addToast("导入" + result.count + "条" + (result.skipped ? "，跳过" + result.skipped + "条(无效采线)" : ""), "success"); fetch() } else { addToast("导入失败:" + result.error, "error") } } catch (err: any) { addToast("导入异常:" + (err?.message || ""), "error") } e.target.value = "" }} /></label>
+        <button type="button" onClick={() => { import("@/lib/templates").then(m => m.downloadTemplate(m.WELL_TPL, "基础信息导入模板", m.WELL_SAMPLE)) }} className="import-btn">📋 下载模板</button>
         <Button variant="ghost" size="sm" type="button" onClick={cf}>清除</Button>
       </div>
-      <div className="flex items-end gap-3 flex-wrap">
-        <div className="relative"><Input ref={wRef} label="井号" value={ew} onChange={e => hs(e.target.value)} placeholder="C05001" w={150} autoComplete="off" />{esg.length > 0 && <div className="absolute z-50 top-full left-0 right-0 mt-2 pop" style={{ background: "var(--surface-3)", border: "1px solid var(--glass-border-strong)", borderRadius: "var(--r-md)", boxShadow: "var(--s-lg)", backdropFilter: "blur(20px)" }}>{esg.map(id => <div key={id} className="px-3 py-2 text-[12px] hover:bg-[var(--surface-1)] cursor-pointer" style={{ fontFamily: "var(--font-mono)" }} onClick={() => { setEw(id); setEsg([]) }}>{id}</div>)}</div>}</div>
-        <Select label="井采线" value={el} onChange={e => { setEl(e.target.value); setEw("") }} options={LINE_OPTS_E} w={150} />
-        <DateField label="成井时间" value={ed} onChange={v => setEd(v)} w={150} />
-        <Select label="工艺" value={et} onChange={e => setEt(e.target.value)} options={TECHS} w={100} />
-        <Input label="备注" value={etn} onChange={e => setEtn(e.target.value)} w={100} />
-        <Select label="尺寸" value={es} onChange={e => setEs(e.target.value)} options={SIZES} w={110} />
-        <Input label="初始水位 m" value={ewl} onChange={e => setEwl(e.target.value)} onBlur={() => { const n = parseFloat(ewl); if (!isNaN(n) && n > 0) setEwl(String(Math.round(-n * 100) / 100)) }} placeholder="-15.00" w={120} />
-        <Input label="设计井深 m" value={edp} onChange={e => setEdp(e.target.value)} placeholder="30.00" w={120} />
-        <Input label="坐标X" value={ex} onChange={e => setEx(e.target.value)} w={120} />
-        <Input label="坐标Y" value={ey} onChange={e => setEy(e.target.value)} w={120} />
-        <label className="flex items-center gap-1.5 text-[12px] cursor-pointer select-none self-end mb-2" style={{ color: "var(--t2)" }}><input type="checkbox" checked={contEntry} onChange={e => setContEntry(e.target.checked)} className="w-3.5 h-3.5" />连续录入</label>
-        <Button variant="primary" size="sm" type="submit">提交</Button>
+      <div className="flex items-end gap-2 overflow-x-auto pb-2" style={{scrollbarWidth:'thin'}}>
+        <div className="relative flex-shrink-0"><Input ref={wRef} label="井号" value={ew} onChange={e => hs(e.target.value)} placeholder="C05001" w={105} autoComplete="off" />{esg.length > 0 && <div className="absolute z-50 top-full left-0 right-0 mt-1 pop" style={{ background: "var(--surface-3)", border: "1px solid var(--glass-border-strong)", borderRadius: "var(--r-md)", boxShadow: "var(--s-lg)", backdropFilter: "blur(20px)" }}>{esg.map(id => <div key={id} className="px-3 py-2 text-[12px] hover:bg-[var(--surface-1)] cursor-pointer" style={{ fontFamily: "var(--font-mono)" }} onClick={() => { setEw(id); setEsg([]) }}>{id}</div>)}</div>}</div>
+        <Select label="井采线" value={el} onChange={e => { setEl(e.target.value); setEw("") }} options={LINE_OPTS_E} w={105} />
+        <DateField label="成井时间" value={ed} onChange={v => setEd(v)} w={115} />
+        <Select label="工艺" value={et} onChange={e => setEt(e.target.value)} options={TECHS} w={85} />
+        <Input label="备注" value={etn} onChange={e => setEtn(e.target.value)} w={80} />
+        <Select label="尺寸" value={es} onChange={e => setEs(e.target.value)} options={SIZES} w={90} />
+        <Input label="初始水位" value={ewl} onChange={e => setEwl(e.target.value)} onBlur={() => { const n = parseFloat(ewl); if (!isNaN(n) && n > 0) setEwl(String(Math.round(-n * 100) / 100)) }} placeholder="-15.00" w={90} />
+        <Input label="井深" value={edp} onChange={e => setEdp(e.target.value)} placeholder="30" w={75} />
+        <Input label="坐标X" value={ex} onChange={e => setEx(e.target.value)} w={85} />
+        <Input label="坐标Y" value={ey} onChange={e => setEy(e.target.value)} w={85} />
+        <label className="flex items-center gap-1 text-[11px] cursor-pointer whitespace-nowrap self-end mb-2 flex-shrink-0" style={{ color: "var(--t2)" }}><input type="checkbox" checked={contEntry} onChange={e => setContEntry(e.target.checked)} className="w-3.5 h-3.5" />连续录入</label>
+        <Button variant="primary" size="sm" type="submit" className="flex-shrink-0" loading={submitting}>提交</Button>
       </div>
     </form></div>}
 

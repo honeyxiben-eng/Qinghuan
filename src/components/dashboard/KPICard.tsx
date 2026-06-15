@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 
 interface KPICardProps {
   label: string
@@ -20,7 +20,7 @@ const ICON_GRADIENTS: Record<string, { grad: string; color: string }> = {
   purple: { grad: 'rgba(167,139,250,0.12)', color: '#a78bfa' },
 }
 
-export function KPICard({ label, value, unit, sublabel, icon = 'indigo', bar, children }: KPICardProps) {
+export const KPICard = memo(function KPICard({ label, value, unit, sublabel, icon = 'indigo', bar, children }: KPICardProps) {
   const [displayValue, setDisplayValue] = useState(typeof value === 'number' ? 0 : value)
   const animRef = useRef<number | undefined>(undefined)
   const startRef = useRef<number | undefined>(undefined)
@@ -64,4 +64,4 @@ export function KPICard({ label, value, unit, sublabel, icon = 'indigo', bar, ch
       )}
     </div>
   )
-}
+})

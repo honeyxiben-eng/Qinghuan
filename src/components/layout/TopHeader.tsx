@@ -62,14 +62,12 @@ export default function TopHeader() {
           backdropFilter: 'blur(32px)',
           WebkitBackdropFilter: 'blur(32px)',
           borderBottom: '1px solid var(--glass-border)',
-          padding: '0 24px',
+          padding: '0 32px',
         }}>
         <div className="flex items-center gap-4">
           <button onClick={toggleSidebar}
-            className="w-9 h-9 rounded-[var(--r-sm)] flex items-center justify-center transition-colors"
-            style={{ color: 'var(--t3)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            className="header-btn w-9 h-9 flex items-center justify-center"
+            style={{ color: 'var(--t3)' }}>
             <PanelLeft size={18} strokeWidth={1.5} />
           </button>
           <div className="flex items-center gap-2.5">
@@ -95,18 +93,14 @@ export default function TopHeader() {
             {mounted ? now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}
           </span>
           <button onClick={() => setSettingsOpen(true)}
-            className="w-9 h-9 rounded-[var(--r-sm)] flex items-center justify-center transition-colors"
-            style={{ color: 'var(--t3)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            className="header-btn w-9 h-9 flex items-center justify-center"
+            style={{ color: 'var(--t3)' }}>
             <Settings size={17} strokeWidth={1.5} />
           </button>
           {r ? (
             <div ref={menuRef} className="relative">
               <button onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-[var(--r-sm)] transition-colors"
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                className="header-btn flex items-center gap-2.5 px-2.5 py-1.5">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
                   style={{ background: 'var(--accent-grad)' }}>
                   {n?.charAt(0) || <User size={12} />}
@@ -122,10 +116,8 @@ export default function TopHeader() {
                     <div className="text-[11px] mt-0.5" style={{ color: 'var(--t3)' }}>{R[r] || r}</div>
                   </div>
                   <button onClick={() => { setLogoutConfirm(true); setUserMenuOpen(false) }}
-                    className="flex items-center gap-2.5 w-full px-3.5 py-2 text-[13px] transition-colors"
-                    style={{ color: 'var(--t2)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    className="flex items-center gap-2.5 w-full px-3.5 py-2 text-[13px] transition-colors hover:bg-[var(--surface-1)]"
+                    style={{ color: 'var(--t2)' }}>
                     <LogOut size={14} /> 退出登录
                   </button>
                 </div>

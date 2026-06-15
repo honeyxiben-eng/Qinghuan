@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import {
-  LayoutDashboard, Database, Activity, Beaker, BarChart3, MessageSquare,
+  LayoutDashboard, Database, Activity, Beaker, BarChart3, MessageSquare, ShieldCheck,
 } from 'lucide-react'
 
 const NAV = [
@@ -13,15 +13,57 @@ const NAV = [
   { label: '化验数据', href: '/lab', icon: Beaker },
   { label: '数据分析', href: '/analysis', icon: BarChart3 },
   { label: '智能问答', href: '/chat', icon: MessageSquare },
+  { label: '审计日志', href: '/audit', icon: ShieldCheck },
 ]
 
 export default function Sidebar() {
   const p = usePathname()
   const collapsed = useAppStore(s => s.sidebarCollapsed)
   const [hoverExpanded, setHoverExpanded] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 769)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   if (p === '/login') return null
 
+  // Mobile: hidden by default, overlay when open
+  if (isMobile) {
+    if (!mobileOpen) return null
+    return (
+      <>
+        <div className="sidebar-overlay fixed inset-0 z-30" onClick={() => setMobileOpen(false)}
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} />
+        <aside className="fixed left-0 z-40 flex flex-col" style={{
+          top: 'var(--topbar-h)', bottom: 0, width: 'var(--sidebar-w)',
+          background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(32px)',
+          borderRight: '1px solid var(--glass-border)',
+        }}>
+          <nav className="flex-1 px-3 pt-4 space-y-1">
+            {NAV.map(item => {
+              const active = item.href === '/' ? p === '/' : p.startsWith(item.href)
+              const Icon = item.icon
+              return (
+                <a key={item.href} href={item.href}
+                  className={`sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-sm)] text-[13px] font-medium transition-all whitespace-nowrap ${active ? 'active' : ''}`}
+                  style={{ color: active ? 'var(--accent)' : 'var(--t2)', fontWeight: active ? 600 : 500 }}>
+                  <Icon size={18} strokeWidth={active ? 2 : 1.5} style={{ flexShrink: 0 }} />
+                  <span>{item.label}</span>
+                </a>
+              )
+            })}
+          </nav>
+        </aside>
+      </>
+    )
+  }
+
+  // Desktop
   const effectiveCollapsed = collapsed && !hoverExpanded
   const navWidth = effectiveCollapsed ? 'var(--sidebar-collapsed-w)' : 'var(--sidebar-w)'
 
@@ -51,13 +93,11 @@ export default function Sidebar() {
           return (
             <a key={item.href} href={item.href}
               title={effectiveCollapsed ? item.label : undefined}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-sm)] text-[13px] font-medium transition-all whitespace-nowrap"
+              className={`sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-sm)] text-[13px] font-medium transition-all whitespace-nowrap ${active ? 'active' : ''}`}
               style={{
                 color: active ? 'var(--accent)' : 'var(--t2)',
-                background: active ? 'var(--accent-soft)' : 'transparent',
                 fontWeight: active ? 600 : 500,
                 justifyContent: effectiveCollapsed ? 'center' : 'flex-start',
-                transitionDuration: 'var(--dur-fast)',
               }}>
               <Icon size={18} strokeWidth={active ? 2 : 1.5} style={{ flexShrink: 0 }} />
               <span style={{

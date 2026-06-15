@@ -83,6 +83,7 @@ export interface Paginated<T> {
   page: number
   pageSize: number
   totalPages: number
+  stats?: Record<string, number | null> | null
 }
 
 // ============================================================

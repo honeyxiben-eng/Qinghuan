@@ -1,13 +1,14 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useInView } from "@/hooks/useInView"
+import { useEffect, useRef, memo } from 'react'
 import * as E from 'echarts'
 
-export function WellTrendChart({ data, height = 340 }: { data: { testDate: string; kPlus: number | null; liPlus: number | null }[], height?: number }) {
-  const r = useRef<HTMLDivElement>(null)
+export const WellTrendChart = memo(function WellTrendChart({ data, height = 340 }: { data: { testDate: string; kPlus: number | null; liPlus: number | null }[], height?: number }) {
+  const r = useRef<HTMLDivElement>(null); const [obsRef, inView] = useInView()
   useEffect(() => {
-    if (!r.current || data.length === 0) return
+    if (!r.current || data.length === 0 || !inView) return
     const chart = E.init(r.current, undefined, { renderer: 'canvas' })
-    const dates = data.map(d => d.testDate)
+    const dates = data.map(d => d.testDate ?? '?')
     const textColor = 'rgba(255,255,255,0.55)'
     const gridColor = 'rgba(255,255,255,0.04)'
 
@@ -60,6 +61,7 @@ export function WellTrendChart({ data, height = 340 }: { data: { testDate: strin
     const re = () => chart.resize()
     window.addEventListener('resize', re)
     return () => { window.removeEventListener('resize', re); chart.dispose() }
-  }, [data, height])
-  return <div ref={r} style={{ height, width: '100%' }} />
-}
+  }, [data, height, inView])
+  const setRefs = (el: HTMLDivElement | null) => { (r as any).current = el; (obsRef as any).current = el }
+  return <div ref={setRefs} style={{ height, width: '100%' }} />
+})

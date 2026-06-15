@@ -1,13 +1,15 @@
 "use client"
 import{useState,useEffect}from"react"
 import{WELL_LINES}from"@/lib/well-data"
-import{compareLines,getTimeSeries,getMonthlyReport,getAvailableMonths,checkKAlerts,checkLiAlerts,getLowKWells,getLineScoring,getWellTrend,getPrevMonthData,getLiLowWells,getMgLiRatio,getKLiRatioRank}from"@/app/actions"
+import{compareLines,getTimeSeries,getMonthlyReport,getAvailableMonths,checkKAlerts,checkLiAlerts,getLowKWells,getLineScoring,getWellTrend,getWellWaterTrend,getPrevMonthData,getLiLowWells,getMgLiRatio,getKLiRatioRank,getLabMonths,getMonthDataForLine,getCurrentDataMonth}from"@/app/actions"
 import{addToast}from"@/components/ui/Toast"
 import{exportXLSX}from"@/lib/export"
 import Button from"@/components/ui/Button"
 import Select from"@/components/ui/Select"
 import Input from"@/components/ui/Input"
 import{WellTrendChart}from"@/components/dashboard/TrendChart"
+import{WaterTrendChart}from"@/components/dashboard/WaterTrendChart"
+import{AlertHeatmap}from"@/components/dashboard/AlertHeatmap"
 import{CompareLineChart}from"@/components/dashboard/CompareChart"
 
 
@@ -47,47 +49,89 @@ function CompareView({onBack}:{onBack:()=>void}){
   const[tsA,setTsA]=useState<any[]>([]);const[tsB,setTsB]=useState<any[]>([])
   const[prevA,setPrevA]=useState<any>(null);const[prevB,setPrevB]=useState<any>(null)
   const[overlay,setOverlay]=useState(false);const[loading,setLoading]=useState(false)
+  const[labMonths,setLabMonths]=useState<{value:string;label:string}[]>([])
+  const[selMonth,setSelMonth]=useState('')
+  const[currentMonth,setCurrentMonth]=useState<string|null>(null)
+  const[overlayLoading,setOverlayLoading]=useState(false)
+
+  useEffect(()=>{
+    Promise.all([getLabMonths(),getCurrentDataMonth()]).then(([ms,cm]:any[])=>{
+      setLabMonths(ms.filter((m:any)=>m.mo!=null).map((m:any)=>({value:m.mo,label:m.mo.replace('-','年')+'月'})))
+      setCurrentMonth(cm)
+    })
+  },[])
 
   const run=async()=>{
-    if(!a||!b||a===b){addToast('请选择两条不同的井采线','warning');return}
-    setLoading(true);setOverlay(false);setPrevA(null);setPrevB(null)
-    const la=WELL_LINES.find(l=>l.shortName===a)!;const lb=WELL_LINES.find(l=>l.shortName===b)!
-    const[sum,ta,tb]=await Promise.all([compareLines(la.id,lb.id),getTimeSeries(la.id),getTimeSeries(lb.id)])as[any,any[],any[]]
-    const sa=(sum as any)?.a||{};const sb=(sum as any)?.b||{}
-    setCmp({a:{name:la.name,sn:la.shortName,...sa},b:{name:lb.name,sn:lb.shortName,...sb}})
-    setTsA(ta);setTsB(tb);setLoading(false)
+    if(!a||!b){addToast('请选择两条井采线','warning');return}
+    if(a===b){addToast('请选择两条不同的井采线','warning');return}
+    const la=WELL_LINES.find(l=>l.shortName===a);const lb=WELL_LINES.find(l=>l.shortName===b)
+    if(!la||!lb){addToast('井采线数据异常','error');return}
+    setLoading(true);setOverlay(false);setPrevA(null);setPrevB(null);setSelMonth('')
+    try{
+      const[sum,ta,tb]=await Promise.all([compareLines(la.id,lb.id),getTimeSeries(la.id),getTimeSeries(lb.id)])as[any,any[],any[]]
+      const sa=(sum as any)?.a||{};const sb=(sum as any)?.b||{}
+      setCmp({a:{name:la.name,sn:la.shortName,...sa},b:{name:lb.name,sn:lb.shortName,...sb}})
+      setTsA(ta);setTsB(tb)
+    }catch(e:any){addToast('数据加载失败：'+e.message,'error')}
+    finally{setLoading(false)}
   }
 
-  const loadPrev=async()=>{
-    if(overlay){setOverlay(false);setPrevA(null);setPrevB(null);return}
+  const doOverlay=async(month:string)=>{
+    if(!month||!a||!b){setOverlay(false);setPrevA(null);setPrevB(null);return}
+    if(month===currentMonth){addToast('不能叠加当月数据（已是最新）','warning');return}
+    setOverlayLoading(true)
     const la=WELL_LINES.find(l=>l.shortName===a)!;const lb=WELL_LINES.find(l=>l.shortName===b)!
-    const[pa,pb]=await Promise.all([getPrevMonthData(la.id),getPrevMonthData(lb.id)])
-    setPrevA(pa);setPrevB(pb);setOverlay(true)
+    const[pa,pb]=await Promise.all([getMonthDataForLine(la.id,month),getMonthDataForLine(lb.id,month)])
+    setPrevA(pa);setPrevB(pb);setOverlay(true);setOverlayLoading(false)
   }
+
+  const onMonthChange=(month:string)=>{
+    setSelMonth(month)
+    if(month&&cmp){doOverlay(month)}
+    else{setOverlay(false);setPrevA(null);setPrevB(null)}
+  }
+
+  const sameMonth=selMonth===currentMonth
 
   const build=(ts:any[],key:string)=>{const m=new Map<string,number>();ts.forEach((d:any)=>{if(d[key]!=null)m.set(d.wellId,d[key])});return Array.from(m.entries()).map(([wellId,value])=>({wellId,value})).sort((a,b)=>a.wellId.localeCompare(b.wellId))}
   const buildPrev=(prev:any,key:string)=>{if(!prev?.data)return[];const m=new Map<string,number>();prev.data.forEach((d:any)=>{if(d[key]!=null)m.set(d.wellId,d[key])});return Array.from(m.entries()).map(([wellId,value])=>({wellId,value})).sort((a,b)=>a.wellId.localeCompare(b.wellId))}
+  const chartKey=a+'_'+b
   const cKA=build(tsA,'kPlus');const cKB=build(tsB,'kPlus');const cLiA=build(tsA,'liPlus');const cLiB=build(tsB,'liPlus')
 
   const prevLabel=(pv:any)=>pv?.prevMonth?pv.prevMonth.replace('-','年')+'月':'上次数据'
 
+  const chartConfigs=[{data:cKA,name:cmp?.a?.sn,color:LC[cmp?.a?.sn]||'#4a9eff',ion:'K⁺',unit:'g/L',prev:buildPrev(prevA,'kPlus'),pl:prevLabel(prevA)},{data:cKB,name:cmp?.b?.sn,color:'#34d399',ion:'K⁺',unit:'g/L',prev:buildPrev(prevB,'kPlus'),pl:prevLabel(prevB)},{data:cLiA,name:cmp?.a?.sn,color:'#60a5fa',ion:'Li⁺',unit:'g/L',prev:buildPrev(prevA,'liPlus'),pl:prevLabel(prevA)},{data:cLiB,name:cmp?.b?.sn,color:'#a78bfa',ion:'Li⁺',unit:'g/L',prev:buildPrev(prevB,'liPlus'),pl:prevLabel(prevB)}]
+
   return<div className='page-container'><Back onClick={onBack}/><h1 className='text-[20px] font-bold mb-4' style={{color:'var(--t1)'}}>井采线对比</h1>
-    <div className='card p-6'><div className='flex items-center gap-3 mb-5 flex-wrap'><Select value={a} onChange={e=>setA(e.target.value)} options={LO} w={160}/><span className='text-[13px] font-medium' style={{color:'var(--t3)'}}>vs</span><Select value={b} onChange={e=>setB(e.target.value)} options={LO} w={160}/><Button variant='primary' size='sm' onClick={run} loading={loading}>开始对比</Button>{cmp&&<Button variant={overlay?'primary':'secondary'} size='sm' onClick={loadPrev}>{overlay?'隐藏上次数据':'叠加上次数据'}</Button>}</div>
+    <div className='card p-6'><div className='flex items-center gap-3 mb-5 flex-wrap'>
+      <Select value={a} onChange={e=>setA(e.target.value)} options={LO} w={160}/>
+      <span className='text-[13px] font-medium' style={{color:'var(--t3)'}}>vs</span>
+      <Select value={b} onChange={e=>setB(e.target.value)} options={LO} w={160}/>
+      <Button variant='primary' size='sm' onClick={run} loading={loading}>开始对比</Button>
+      {cmp&&<>
+        <span className='text-[11px]' style={{color:'var(--t4)'}}>当前数据：{currentMonth?currentMonth.replace('-','年')+'月':'--'}</span>
+        <Select value={selMonth} onChange={e=>onMonthChange(e.target.value)}
+          options={[{value:'',label:'选择叠加月份'},...labMonths.filter(m=>m.value!==currentMonth)]} w={150}/>
+        {selMonth&&!sameMonth&&<Button variant={overlay?'primary':'secondary'} size='sm' loading={overlayLoading} onClick={()=>{if(overlay){setOverlay(false);setPrevA(null);setPrevB(null)}else{doOverlay(selMonth)}}}>{overlay?'取消叠加':'叠加 '+selMonth.replace('-','年')+'月'}</Button>}
+        {sameMonth&&<span className='text-[11px]' style={{color:'var(--amber)'}}>不可叠加当月数据</span>}
+      </>}
+    </div>
+      {loading&&!cmp&&<div className='py-16 flex justify-center'><div className='w-6 h-6 border-[3px] border-[var(--accent)] border-t-transparent rounded-full animate-spin'/></div>}
       {cmp&&<>
         <div className='grid grid-cols-2 gap-4 mb-5'>{[cmp.a,cmp.b].map((d:any,i:number)=><div key={i} className='p-4 rounded-[14px]' style={{background:'var(--surface-1)'}}><div className='flex items-center gap-2 mb-3'><div className='w-2.5 h-2.5 rounded-full' style={{background:LC[d.sn]||'#4a9eff'}}/><span className='text-[14px] font-bold'>{d.name}</span></div><div className='grid grid-cols-3 gap-3 text-center'><div className='p-2.5 rounded-[10px] bg-[var(--surface-2)]'><div className='text-[10px] font-semibold mb-1' style={{color:'var(--t3)'}}>K⁺均值</div><div className='text-lg font-bold' style={{color:'#34d399'}}>{d.avgK??'?'}<span className='text-[10px] font-medium ml-0.5'>g/L</span></div></div><div className='p-2.5 rounded-[10px] bg-[var(--surface-2)]'><div className='text-[10px] font-semibold mb-1' style={{color:'var(--t3)'}}>Li⁺均值</div><div className='text-lg font-bold' style={{color:'#60a5fa'}}>{d.avgLi??'?'}<span className='text-[10px] font-medium ml-0.5'>g/L</span></div></div><div className='p-2.5 rounded-[10px] bg-[var(--surface-2)]'><div className='text-[10px] font-semibold mb-1' style={{color:'var(--t3)'}}>动水位</div><div className='text-lg font-bold' style={{color:'#fbbf24'}}>{d.avgW??'?'}<span className='text-[10px] font-medium ml-0.5'>m</span></div></div></div></div>)}</div>
         <div className='grid grid-cols-2 gap-3'>
-          {[{data:cKA,name:cmp.a.sn,color:LC[cmp.a.sn]||'#4a9eff',ion:'K⁺',unit:'g/L',prev:buildPrev(prevA,'kPlus'),pl:prevLabel(prevA)},{data:cKB,name:cmp.b.sn,color:'#34d399',ion:'K⁺',unit:'g/L',prev:buildPrev(prevB,'kPlus'),pl:prevLabel(prevB)},{data:cLiA,name:cmp.a.sn,color:'#60a5fa',ion:'Li⁺',unit:'g/L',prev:buildPrev(prevA,'liPlus'),pl:prevLabel(prevA)},{data:cLiB,name:cmp.b.sn,color:'#a78bfa',ion:'Li⁺',unit:'g/L',prev:buildPrev(prevB,'liPlus'),pl:prevLabel(prevB)}].map((x,i)=><div key={i} className='p-3 rounded-[12px]' style={{background:'var(--surface-1)'}}><CompareLineChart title={x.name+' '+x.ion} data={x.data} prevData={overlay?x.prev:undefined} prevLabel={x.pl} color={x.color} unit={x.unit} height={220}/></div>)}
+          {chartConfigs.map((x,i)=><div key={chartKey+'_'+i} className='p-3 rounded-[12px]' style={{background:'var(--surface-1)'}}><CompareLineChart title={x.name+' '+x.ion} data={x.data} prevData={overlay?x.prev:undefined} prevLabel={x.pl} color={x.color} unit={x.unit} height={220}/></div>)}
         </div>
-      </>}{!cmp&&!loading&&<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>选择两条井采线并点击开始对比</p></div>}
+      </>}{!cmp&&!loading&&<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>选择两条不同的井采线，点击开始对比</p></div>}
     </div>
   </div>
 }
 
 function ReportView({onBack}:{onBack:()=>void}){
   const[mo,setMo]=useState('');const[mos,setMos]=useState<{value:string;label:string}[]>([]);const[loading,setLoading]=useState(false);const[report,setReport]=useState<any>(null);const[lowK,setLowK]=useState<any[]>([]);const[lowLi,setLowLi]=useState<any[]>([]);const[score,setScore]=useState<any[]>([]);const[mgLiR,setMgLiR]=useState<any[]>([]);const[kLiR,setKLiR]=useState<any[]>([])
-  useEffect(()=>{getAvailableMonths().then((ms:unknown)=>{const months=ms as any[];setMos(months.map((m:any)=>({value:m.mo,label:m.mo.replace('-','年')+'月'})))})},[])
+  useEffect(()=>{getAvailableMonths().then((ms:unknown)=>{const months=ms as any[];setMos(months.filter((m:any)=>m.mo!=null).map((m:any)=>({value:m.mo,label:m.mo.replace('-','年')+'月'})))})},[])
   const gen=async()=>{if(!mo){addToast('请选择月份','warning');return};setLoading(true);const[r,lk,ll,sc,mr,kr]=await Promise.all([getMonthlyReport(mo),getLowKWells(mo),getLiLowWells(mo),getLineScoring(mo),getMgLiRatio(mo),getKLiRatioRank(mo)])as[any,any[],any[],any[],any[],any[]];setReport(r);setLowK(lk);setLowLi(ll);setScore(sc);setMgLiR(mr);setKLiR(kr);setLoading(false)}
-  const exp=()=>{if(!score.length)return;exportXLSX('月度报告_'+mo,['井采线','K⁺均值','Li⁺均值','Mg²⁺均值','比重均值','矿化度均值','井数'],score.map((l:any)=>[l.lineName,l.avgK,l.avgLi,l.avgMg,l.avgDensity,l.avgSalinity,l.cnt]));addToast('已导出','success')}
+  const exp=()=>{if(!score.length)return;exportXLSX({filename:'月度报告_'+mo,headers:['井采线','K⁺均值','Li⁺均值','Mg²⁺均值','比重均值','矿化度均值','井数'],rows:score.map((l:any)=>[l.lineName,l.avgK,l.avgLi,l.avgMg,l.avgDensity,l.avgSalinity,l.cnt])});addToast('已导出','success')}
   const totalWells=report?.reduce((s:number,r:any)=>s+(r.cnt||0),0)||0
   const avgKAll=report?.length?report.reduce((s:number,r:any)=>s+(r.avgK||0),0)/report.length:0
   const avgLiAll=report?.length?report.reduce((s:number,r:any)=>s+(r.avgLi||0),0)/report.length:0
@@ -195,7 +239,7 @@ function AlertView({type,onBack}:{type:'k'|'li';onBack:()=>void}){
   const[th,setTh]=useState('20');const[mode,setMode]=useState<'pct'|'abs'>('pct');const[results,setResults]=useState<any[]>([]);const[loading,setLoading]=useState(false)
   const isK=type==='k'
   const run=async()=>{const t=parseFloat(th);if(isNaN(t)||t<=0){addToast('请输入有效阈值','warning');return};setLoading(true);const r:any=isK?await checkKAlerts(mode==='pct'?t:0):await checkLiAlerts(mode==='pct'?t:0);const f=mode==='abs'?r.filter((d:any)=>(d.dropAbs??0)>=t):r;setResults(f);setLoading(false)}
-  const exp=()=>{exportXLSX((isK?'K':'Li')+'_alerts',['井号','井采线','上次数据','最新','降幅%','降幅g/L'],results.map((d:any)=>[d.wellId,d.lineName||'',isK?d.prevK:d.prevLi,isK?d.latestK:d.latestLi,d.dropPct,d.dropAbs]));addToast('已导出','success')}
+  const exp=()=>{exportXLSX({filename:(isK?'K':'Li')+'_alerts',headers:['井号','井采线','上次数据','最新','降幅%','降幅g/L'],rows:results.map((d:any)=>[d.wellId,d.lineName||'',isK?d.prevK:d.prevLi,isK?d.latestK:d.latestLi,d.dropPct,d.dropAbs])});addToast('已导出','success')}
 
   return<div className='page-container'><Back onClick={onBack}/><h1 className='text-[20px] font-bold mb-4' style={{color:'var(--t1)'}}>{isK?'K⁺':'Li⁺'} 异常检测</h1>
     <div className='card p-6'><div className='flex items-center gap-3 mb-5 flex-wrap'>
@@ -205,19 +249,23 @@ function AlertView({type,onBack}:{type:'k'|'li';onBack:()=>void}){
       <Button variant='primary' size='sm' onClick={run} loading={loading}>检测</Button>
       {results.length>0&&<Button variant='secondary' size='sm' onClick={exp}>导出</Button>}
     </div>
-    {results.length>0?<div className='overflow-x-auto'><table className='w-full text-[13px]'><thead><tr style={{borderBottom:'1px solid var(--glass-border)'}}><th className='text-left py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>井号</th><th className='text-left py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>井采线</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>上次数据</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>最新</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>降幅%</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>降幅g/L</th></tr></thead><tbody>{results.map((d:any,i:number)=><tr key={i} className='hover:bg-[var(--surface-1)]' style={{borderBottom:'1px solid var(--border-light)'}}><td className='py-1.5 px-2 font-semibold font-mono' style={{color:'var(--t1)'}}>{d.wellId}</td><td className='py-1.5 px-2' style={{color:'var(--t2)'}}>{d.lineName||''}</td><td className='py-1.5 px-2 text-right font-mono' style={{color:'var(--t2)'}}>{(isK?d.prevK:d.prevLi)?.toFixed(3)??'?'}</td><td className='py-1.5 px-2 text-right font-mono font-semibold' style={{color:isK?'#4a9eff':'#60a5fa'}}>{(isK?d.latestK:d.latestLi)?.toFixed(3)??'?'}</td><td className='py-1.5 px-2 text-right font-mono font-semibold' style={{color:d.dropPct!=null?'var(--t1)':'#f87171'}}>{d.dropPct!=null&&<>{d.dropPct>0?'+':''}{d.dropPct.toFixed(2)}%</>}</td><td className='py-1.5 px-2 text-right font-mono' style={{color:'#fbbf24'}}>{d.dropAbs?.toFixed(3)}</td></tr>)}</tbody></table></div>:!loading&&<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>设置阈值开始检测</p></div>}
+    {results.length>0&&<div><div className='overflow-x-auto'><table className='w-full text-[13px]'><thead><tr style={{borderBottom:'1px solid var(--glass-border)'}}><th className='text-left py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>井号</th><th className='text-left py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>井采线</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>上次数据</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>最新</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>降幅%</th><th className='text-right py-2 px-2 font-semibold' style={{color:'var(--t3)'}}>降幅g/L</th></tr></thead><tbody>{results.map((d:any,i:number)=><tr key={i} className='hover:bg-[var(--surface-1)]' style={{borderBottom:'1px solid var(--border-light)'}}><td className='py-1.5 px-2 font-semibold font-mono' style={{color:'var(--t1)'}}>{d.wellId}</td><td className='py-1.5 px-2' style={{color:'var(--t2)'}}>{d.lineName||''}</td><td className='py-1.5 px-2 text-right font-mono' style={{color:'var(--t2)'}}>{(isK?d.prevK:d.prevLi)?.toFixed(3)??'?'}</td><td className='py-1.5 px-2 text-right font-mono font-semibold' style={{color:isK?'#4a9eff':'#60a5fa'}}>{(isK?d.latestK:d.latestLi)?.toFixed(3)??'?'}</td><td className='py-1.5 px-2 text-right font-mono font-semibold' style={{color:d.dropPct!=null?'var(--t1)':'#f87171'}}>{d.dropPct!=null&&<>{d.dropPct>0?'+':''}{d.dropPct.toFixed(2)}%</>}</td><td className='py-1.5 px-2 text-right font-mono' style={{color:'#fbbf24'}}>{d.dropAbs?.toFixed(3)}</td></tr>)}</tbody></table></div>
+      <AlertHeatmap data={results.map((d:any)=>({wellId:d.wellId,lineName:d.lineName,dropPct:d.dropPct,dropAbs:d.dropAbs,prevValue:isK?d.prevK:d.prevLi,latestValue:isK?d.latestK:d.latestLi}))} type={type} />
+    </div>}
+    {!loading&&results.length===0&&<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>设置阈值开始检测</p></div>}
     </div>
   </div>
 }
 
 function TrendView({onBack}:{onBack:()=>void}){
-  const[line,setLine]=useState('');const[wellId,setWellId]=useState('');const[data,setData]=useState<any[]>([]);const[loading,setLoading]=useState(false);const[loaded,setLoaded]=useState(false)
+  const[line,setLine]=useState('');const[wellId,setWellId]=useState('');const[data,setData]=useState<any[]>([]);const[waterData,setWaterData]=useState<any[]>([]);const[loading,setLoading]=useState(false);const[loaded,setLoaded]=useState(false)
   const lineData=WELL_LINES.find(l=>l.shortName===line)as any
   const idOpts=lineData?[{value:'',label:'选择井号'} as const,...lineData.numbers.map((n:number)=>{const id=lineData.prefix+String(n).padStart(3,'0');return{value:id,label:id}})]:[{value:'',label:'请先选择井采线'}]
-  const run=async()=>{if(!wellId){addToast('请选择井号','warning');return};setLoading(true);const d=await getWellTrend(wellId);setData(d);setLoaded(true);setLoading(false)}
+  const run=async()=>{if(!wellId){addToast('请选择井号','warning');return};setLoading(true);const[d,w]=await Promise.all([getWellTrend(wellId),getWellWaterTrend(wellId)]);setData(d);setWaterData(w);setLoaded(true);setLoading(false)}
+  const hasIon=data.length>0;const hasWater=waterData.length>0
   return<div className='page-container'><Back onClick={onBack}/><h1 className='text-[20px] font-bold mb-4' style={{color:'var(--t1)'}}>单井趋势</h1>
     <div className='card p-6'><div className='flex items-end gap-3 mb-5'><Select label='井采线' value={line} onChange={e=>{setLine(e.target.value);setWellId('')}} options={[{value:'',label:'选择井采线'},...WELL_LINES.map(l=>({value:l.shortName,label:l.name}))]} w={180}/><Select label='井号' value={wellId} onChange={e=>setWellId(e.target.value)} options={idOpts} w={160}/><Button variant='primary' size='sm' onClick={run} loading={loading}>查询</Button></div>
-      {loaded&&data.length>0?<WellTrendChart data={data}/>:loaded&&data.length===0?<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>该井暂无化验数据</p></div>:!loading?<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>请选择井采线和井号查看趋势</p></div>:null}
+      {loaded&&(hasIon||hasWater)?<div className='grid grid-cols-2 gap-4'>{hasIon?<div className='p-3 rounded-[12px]' style={{background:'var(--surface-1)'}}><WellTrendChart data={data} height={300}/></div>:<div className='py-16 text-center rounded-[12px]' style={{background:'var(--surface-1)'}}><p className='text-[13px]' style={{color:'var(--t3)'}}>该井暂无化验数据</p></div>}{hasWater?<div className='p-3 rounded-[12px]' style={{background:'var(--surface-1)'}}><WaterTrendChart data={waterData} height={300}/></div>:<div className='py-16 text-center rounded-[12px]' style={{background:'var(--surface-1)'}}><p className='text-[13px]' style={{color:'var(--t3)'}}>该井暂无监测数据</p></div>}</div>:loaded&&!hasIon&&!hasWater?<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>该井暂无化验和监测数据</p></div>:!loading?<div className='py-16 text-center'><p className='text-[13px]' style={{color:'var(--t3)'}}>请选择井采线和井号查看趋势</p></div>:null}
     </div>
   </div>
 }

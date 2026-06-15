@@ -1,4 +1,5 @@
 'use client'
+import { memo } from 'react'
 
 interface GaugeIndicatorProps {
   value: number | null
@@ -11,7 +12,7 @@ interface GaugeIndicatorProps {
   size?: number
 }
 
-export function GaugeIndicator({
+export const GaugeIndicator = memo(function GaugeIndicator({
   value, max = 100, threshold = 6.5,
   label, unit = '', color = '#4a9eff',
   thresholdColor = '#fbbf24', size = 80
@@ -51,4 +52,4 @@ export function GaugeIndicator({
       </div>
     </div>
   )
-}
+})

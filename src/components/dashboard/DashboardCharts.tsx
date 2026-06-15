@@ -1,8 +1,8 @@
 'use client'
-import{useEffect,useRef}from'react'
+import{useEffect,useRef,memo}from'react'
 import*as E from'echarts'
 
-export function WellLineStackedBar({data,height=300}:{data:{name:string;total:number;active:number;stopped:number;abandoned:number}[],height?:number}){
+export const WellLineStackedBar=memo(function WellLineStackedBar({data,height=300}:{data:{name:string;total:number;active:number;stopped:number;abandoned:number}[],height?:number}){
   const r=useRef<HTMLDivElement>(null)
   useEffect(()=>{
     if(!r.current||data.length===0)return
@@ -25,4 +25,4 @@ export function WellLineStackedBar({data,height=300}:{data:{name:string;total:nu
     return()=>{window.removeEventListener('resize',re);chart.dispose()}
   },[data,height])
   return<div ref={r} style={{height,width:'100%'}}/>
-}
+})

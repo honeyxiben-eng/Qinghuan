@@ -4,11 +4,13 @@ import { WELL_LINES } from "@/lib/well-data"
 import { getDashboardStats, getWellLineStats, getWellLineChem, getWellLineWater } from "@/app/actions"
 import { LineMarqueeTable } from "@/components/dashboard/LineMarqueeTable"
 import { usePolling } from "@/hooks/usePolling"
+import { useCountUp } from "@/hooks/useCountUp"
 import { useAppStore } from "@/lib/store"
 import {
   Beaker, AlertTriangle, TrendingDown, Clock,
   HardDrive, CheckCircle2, RefreshCw
 } from "lucide-react"
+import { StatCardSkeleton, ChartSkeleton, MarqueeSkeleton } from "@/components/ui/Skeleton"
 
 function ml(ym: string | null) { if (!ym) return ""; const [y, m] = ym.split("-"); return y + "年" + parseInt(m) + "月" }
 function same(a: any, b: any) { return JSON.stringify(a) === JSON.stringify(b) }
@@ -58,18 +60,17 @@ export default function Dashboard() {
 
   if (!st && !handleError) return (
     <div className="page-container">
-      <div className="grid grid-cols-6 gap-4">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-          <div key={i} className="stat-card">
-            <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 12, marginBottom: 14 }} />
-            <div className="skeleton" style={{ width: '60%', height: 12, marginBottom: 10 }} />
-            <div className="skeleton" style={{ width: '40%', height: 28 }} />
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <StatCardSkeleton key={i} index={i} />
         ))}
       </div>
       <div className="grid grid-cols-3 gap-4 mt-5">
-        <div className="card p-5 col-span-2"><div className="skeleton" style={{ width: '100%', height: 340 }} /></div>
-        <div className="card p-5"><div className="skeleton" style={{ width: '100%', height: 340 }} /></div>
+        <ChartSkeleton height={340} />
+        <ChartSkeleton height={340} />
+      </div>
+      <div className="mt-5">
+        <MarqueeSkeleton />
       </div>
     </div>
   )
@@ -81,7 +82,7 @@ export default function Dashboard() {
       </div>
       <p className="text-[16px] font-bold mb-2" style={{ color: "var(--t1)" }}>数据加载失败</p>
       <p className="text-[13px] mb-1" style={{ color: "var(--t2)" }}>{errMsg || "请检查数据库连接后重试"}</p>
-      <button onClick={() => load()} className="btn btn-primary mt-5"><RefreshCw size={14} />重新加载</button>
+      <button onClick={() => load()} className="btn btn-v-primary mt-5"><RefreshCw size={14} />重新加载</button>
     </div></div>
   )
 
@@ -133,7 +134,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => load()} className="btn btn-sm btn-secondary">
+          <button onClick={() => load()} className="btn btn-sm btn-v-secondary">
             {pollLoading ? <span className="w-3 h-3 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" /> : <RefreshCw size={13} />}
             刷新
           </button>
@@ -158,7 +159,7 @@ export default function Dashboard() {
               {k.tag && <div className="text-[11px] font-semibold mb-1.5" style={{ color: k.color }}>{k.tag}</div>}
               <div className="stat-label">{k.label}</div>
               <div className="flex items-baseline gap-1 mt-1">
-                <span className="stat-value" style={{ color: k.color }}>{k.value}</span>
+                <AnimatedValue value={k.value} color={k.color} />
                 <span className="text-[12px] font-medium" style={{ color: "var(--t3)" }}>{k.unit}</span>
               </div>
               {k.bar !== undefined && (
@@ -198,6 +199,11 @@ export default function Dashboard() {
       </div>
     </div>
   )
+}
+
+function AnimatedValue({ value, color }: { value: number; color: string }) {
+  const animated = useCountUp(value, 800)
+  return <span className="stat-value" style={{ color }}>{animated}</span>
 }
 
 function ChartLoading() {

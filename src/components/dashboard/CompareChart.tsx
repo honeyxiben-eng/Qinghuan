@@ -1,19 +1,25 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, memo } from 'react'
 import * as E from 'echarts'
+import { useEChartsGroup } from '@/components/ui/useEChartsGroup'
+import { useInView } from '@/hooks/useInView'
 
 interface WellPoint { wellId: string; value: number | null }
 interface Props {
   title: string; data: WellPoint[]; prevData?: WellPoint[]; prevLabel?: string
-  color: string; unit: string; height?: number
+  color: string; unit: string; height?: number; groupId?: string
 }
 
-export function CompareLineChart({ title, data, prevData, prevLabel, color, unit, height = 280 }: Props) {
+export const CompareLineChart = memo(function CompareLineChart({ title, data, prevData, prevLabel, color, unit, height = 280, groupId }: Props) {
   const r = useRef<HTMLDivElement>(null)
+  const [obsRef, inView] = useInView()
+  const groupRef = useEChartsGroup(groupId || null)
+  const setRefs = (el: HTMLDivElement | null) => { (r as any).current = el; (obsRef as any).current = el }
   useEffect(() => {
-    if (!r.current || data.length === 0) return
+    if (!r.current || data.length === 0 || !inView) return
     const chart = E.init(r.current, undefined, { renderer: 'canvas' })
-    const ids = data.map(d => d.wellId.slice(-2))
+    groupRef.current = chart
+    const ids = data.map(d => d.wellId?.slice(-2) ?? '??')
     const textColor = 'rgba(255,255,255,0.55)'
     const gridColor = 'rgba(255,255,255,0.04)'
 
@@ -65,6 +71,6 @@ export function CompareLineChart({ title, data, prevData, prevLabel, color, unit
     const re = () => chart.resize()
     window.addEventListener('resize', re)
     return () => { window.removeEventListener('resize', re); chart.dispose() }
-  }, [data, prevData, color, title, unit, prevLabel, height])
-  return <div ref={r} style={{ height, width: '100%' }} />
-}
+  }, [data, prevData, color, title, unit, prevLabel, height, groupId, inView])
+  return <div ref={setRefs} style={{ height, width: '100%', minHeight: height }} />
+})

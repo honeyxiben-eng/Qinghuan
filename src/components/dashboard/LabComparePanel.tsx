@@ -1,6 +1,7 @@
 'use client'
+import { memo } from 'react'
 import { X, ArrowUp, ArrowDown, Minus } from 'lucide-react'
-import type { LabRecord } from '@/types'
+import type { LabRecord } from '@/shared/types'
 
 interface Props {
   recordA: LabRecord
@@ -23,7 +24,7 @@ const FIELDS: { key: keyof LabRecord; label: string; decimals: number; unit: str
   { key: 'viscosity', label: '粘度', decimals: 2, unit: '' },
 ]
 
-export function LabComparePanel({ recordA, recordB, onClose }: Props) {
+export const LabComparePanel = memo(function LabComparePanel({ recordA, recordB, onClose }: Props) {
   const val = (r: LabRecord, k: keyof LabRecord) => r[k] as number | null | undefined
   const fmt = (v: number | null | undefined, d: number) => v != null ? v.toFixed(d) : '—'
   const arrow = (a: number | null | undefined, b: number | null | undefined) => {
@@ -115,9 +116,9 @@ export function LabComparePanel({ recordA, recordB, onClose }: Props) {
         </div>
 
         <div className="px-6 py-3 border-t flex justify-end gap-2.5" style={{ borderColor: 'var(--border-light)' }}>
-          <button onClick={onClose} className="btn btn-secondary btn-sm">关闭对比</button>
+          <button onClick={onClose} className="btn btn-v-secondary btn-sm">关闭对比</button>
         </div>
       </div>
     </div>
   )
-}
+})

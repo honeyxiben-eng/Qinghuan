@@ -92,7 +92,7 @@ export function checkLiAlerts(t: number) {
 }
 
 export function getLowKWells(m: string) { return all("SELECT wl.name as lineName,wi.wellId,ld.kPlus FROM WellLineInfo wl JOIN WellInfo wi ON wi.lineId=wl.id JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE ld.kPlus IS NOT NULL AND ld.kPlus<6.5 ORDER BY wl.regionSeq,wi.wellId", [m]) }
-export function getAvailableMonths() { return all<{ mo: string }>("SELECT DISTINCT strftime('%Y-%m',testDate) as mo FROM LabData ORDER BY mo DESC") }
+export function getAvailableMonths() { return all<{ mo: string }>("SELECT DISTINCT strftime('%Y-%m',testDate) as mo FROM LabData WHERE testDate IS NOT NULL ORDER BY mo DESC") }
 export function getIonRanking(m: string) { return all("SELECT wi.wellId,wl.name as lineName,ld.kPlus,ld.liPlus FROM WellInfo wi JOIN WellLineInfo wl ON wi.lineId=wl.id JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE ld.kPlus IS NOT NULL ORDER BY ld.kPlus ASC", [m]) }
 export function getLineScoring(m: string) { return all("SELECT wl.name as lineName,wl.shortName,ROUND(AVG(ld.kPlus),3) as avgK,ROUND(AVG(ld.liPlus),3) as avgLi,ROUND(AVG(ld.mg2Plus),3) as avgMg,ROUND(AVG(ld.density),4) as avgDensity,ROUND(AVG(ld.salinity),3) as avgSalinity,COUNT(ld.id) as cnt FROM WellLineInfo wl JOIN WellInfo wi ON wi.lineId=wl.id JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE ld.kPlus IS NOT NULL GROUP BY wl.id ORDER BY avgK DESC", [m]) }
 
@@ -114,6 +114,10 @@ export function getPrevMonthData(lineId: number) {
 
 export function getWellTrend(wellId: string) {
   return all<{ testDate: string; kPlus: number | null; liPlus: number | null }>("SELECT testDate,kPlus,liPlus FROM LabData WHERE wellId=? AND testDate>=datetime('now','-18 months') ORDER BY testDate ASC", [wellId])
+}
+
+export function getWellWaterTrend(wellId: string) {
+  return all<{ collectDate: string; dynamicWater: number | null }>("SELECT collectDate,dynamicWater FROM DynamicMonitoring WHERE wellId=? AND collectDate>=datetime('now','-18 months') ORDER BY collectDate ASC", [wellId])
 }
 
 export function getLiLowWells(month: string) { return all("SELECT wl.name as lineName,wi.wellId,ld.liPlus FROM WellLineInfo wl JOIN WellInfo wi ON wi.lineId=wl.id JOIN LabData ld ON ld.wellId=wi.wellId AND strftime('%Y-%m',ld.testDate)=? WHERE ld.liPlus<0.15 ORDER BY wl.regionSeq,wi.wellId", [month]) }
