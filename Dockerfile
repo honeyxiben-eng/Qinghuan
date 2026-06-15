@@ -7,8 +7,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 安装依赖
+# 安装依赖（先复制 prisma 让 postinstall 的 prisma generate 能跑）
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
 RUN npm ci --omit=dev
 
 # 复制源码
