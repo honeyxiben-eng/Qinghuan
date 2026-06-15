@@ -38,6 +38,7 @@
   "exclude": [
     "node_modules",
     "prisma/seed.ts",
+    "prisma/migrate.ts",
     "apps",
     "nocodb-source"
   ]
