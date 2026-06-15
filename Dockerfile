@@ -37,6 +37,9 @@ COPY --from=builder /app/public ./public
 # 复制 node_modules (Prisma 运行时需要)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
+# 修复权限：数据库目录需要可写
+RUN chown -R appuser:appgroup /app/prisma /app/.next
+
 USER appuser
 EXPOSE 3456
 
